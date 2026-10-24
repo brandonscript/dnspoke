@@ -58,5 +58,5 @@ def test_acl_subprocess_does_not_inherit_incompatible_modules(tmp_path: Path, mo
         assert not any(key.upper() == 'PSMODULEPATH' for key in env)
         assert env['DNSPOKE_ACL_PATH'] == str(tmp_path.resolve())
         return subprocess.CompletedProcess(command, 0, stdout=b'', stderr=b'')
-    monkeypatch.setattr(storage.subprocess, 'run', run)
+    monkeypatch.setattr('dnspoke.storage.subprocess.run', run)
     storage.windows_acl(tmp_path)
