@@ -81,6 +81,9 @@ class Store:
                     at REAL NOT NULL, device TEXT NOT NULL, hostname TEXT NOT NULL,
                     old_ip TEXT, new_ip TEXT NOT NULL, changed INTEGER NOT NULL);
             ''')
+        with self.transaction() as db:
+            if 'device_hostname' not in {row['name'] for row in db.execute('PRAGMA table_info(devices)')}:
+                db.execute('ALTER TABLE devices ADD COLUMN device_hostname TEXT')
         Path(path).chmod(0o600)
 
     @contextmanager
@@ -119,7 +122,12 @@ class Store:
             db.execute('INSERT INTO invites VALUES (?,?,?,?)', (invite_digest(secret), name, time.time() + ttl, adopt))
         return secret
 
-    def enroll(self, invite: object) -> Enrollment:
+    def enroll(self, invite: object, device_hostname: object = None) -> Enrollment:
+        if device_hostname is not None and (
+            not isinstance(device_hostname, str) or not 1 <= len(device_hostname) <= 253
+            or not device_hostname.isprintable() or device_hostname != device_hostname.strip()
+        ):
+            raise Rejected('Device hostname must be 1–253 printable characters without surrounding whitespace')
         secret, device = new_secret(), secrets.token_hex(12)
         now = time.time()
         with self.transaction() as db:
@@ -128,7 +136,7 @@ class Store:
                 raise Rejected('Invalid or expired invite', 401)
             if db.execute('SELECT 1 FROM devices WHERE hostname=? AND revoked=0', (row['hostname'],)).fetchone():
                 raise Rejected('Hostname already assigned', 409)
-            db.execute('INSERT INTO devices(id,hash,hostname,adopt,created) VALUES(?,?,?,?,?)', (device, digest(secret), row['hostname'], row['adopt'], now))
+            db.execute('INSERT INTO devices(id,hash,hostname,adopt,created,device_hostname) VALUES(?,?,?,?,?,?)', (device, digest(secret), row['hostname'], row['adopt'], now, device_hostname))
             db.execute('DELETE FROM invites WHERE hash=?', (invite_digest(invite),))
         return {'device_id': device, 'device_secret': secret, 'hostname': row['hostname']}
 

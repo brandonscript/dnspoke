@@ -90,10 +90,13 @@ def test_admin_device_management_through_cli(tmp_path: Path, monkeypatch: pytest
     database = tmp_path / 'state.sqlite3'
     monkeypatch.setenv('DNS_DATABASE', str(database))
     store = Store(database)
-    device = store.enroll(store.invite('alice.example.com'))
+    device = store.enroll(store.invite('alice.example.com'), 'test-laptop.local')
     monkeypatch.setattr('sys.argv', ['dnspoke', 'admin', 'devices'])
     assert cli.main() == 0
-    assert device['device_id'] in capsys.readouterr().out
+    listing = capsys.readouterr().out
+    assert device['device_id'] in listing
+    assert 'test-laptop.local' in listing
+    assert 'registered_at' in listing and '+00:00' in listing
     monkeypatch.setattr('sys.argv', ['dnspoke', 'admin', 'revoke', device['device_id']])
     assert cli.main() == 0
     assert 'Device revoked' in capsys.readouterr().out

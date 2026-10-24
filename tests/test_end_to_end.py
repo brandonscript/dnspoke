@@ -56,11 +56,14 @@ def test_https_enroll_update_revoke_and_refuse_redirects(tmp_path: Path,monkeypa
     worker.start()
     endpoint=f'https://localhost:{server.server_port}'
     credential_file=tmp_path/'client-private/device.json'
+    monkeypatch.setattr('socket.gethostname', lambda: 'test-laptop.local')
     invite=store.invite('alice.example.com')
     monkeypatch.setattr('builtins.input',lambda _:pack_invite(endpoint, invite))
     try:
         monkeypatch.setattr('sys.argv',['dnspoke','--config',str(credential_file),'enroll'])
         assert cli.main()==0
+        with store.transaction() as db:
+            assert db.execute('SELECT device_hostname FROM devices').fetchone()['device_hostname'] == 'test-laptop.local'
         cli.update(credential_file)
         assert provider.calls==[('alice.example.com','8.8.8.8',False)]
         assert cli.read_config(credential_file)['last_ip']=='8.8.8.8'

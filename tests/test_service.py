@@ -266,3 +266,26 @@ def test_cross_device_tokens_cannot_be_substituted(setup: tuple[Store, FakeProvi
     alice_response = update(store,client,alice)
     assert alice_response.json is not None
     assert alice_response.json['hostname']=='alice.example.com'
+
+
+def test_existing_database_migrates_without_losing_credentials(tmp_path: Path) -> None:
+    path = tmp_path / 'legacy.sqlite3'
+    store = Store(path)
+    device = enroll(store)
+    with store.transaction() as db:
+        db.execute('ALTER TABLE devices DROP COLUMN device_hostname')
+    migrated = Store(path)
+    Store(path)
+    assert migrated.token(device['device_secret'])['hostname'] == 'alice.example.com'
+    with migrated.transaction() as db:
+        row = db.execute('SELECT * FROM devices').fetchone()
+        assert row['device_hostname'] is None
+        assert row['created'] > 0
+
+
+@pytest.mark.parametrize('value', ['', 'x' * 254, 'bad\nname', '\x1b[31mhost', ' host', 123, {'name': 'host'}])
+def test_invalid_device_hostname_does_not_consume_invite(setup: tuple[Store, FakeProvider, FlaskClient], value: object) -> None:
+    store, _, client = setup
+    invite = store.invite('alice.example.com')
+    assert send(client, '/v1/enroll', data={'invite': invite, 'device_hostname': value}).status_code == 400
+    assert send(client, '/v1/enroll', data={'invite': invite, 'device_hostname': 'laptop.local'}).status_code == 200

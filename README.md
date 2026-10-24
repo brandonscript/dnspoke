@@ -59,6 +59,8 @@ docker compose -f compose.example.yml exec dnspoke dnspoke admin revoke DEVICE_I
 docker compose -f compose.example.yml exec dnspoke dnspoke admin audit
 ```
 
+Device listings include the device ID, its reported local hostname (`device_hostname`), assigned DNS hostname, and registration date (`registered_at`, in UTC). The local hostname is captured at enrollment; older clients show `null`.
+
 One active device is allowed per hostname. Revoke a device before replacing it. Revocation disables its credential and outstanding update tokens; the DNS record stays in place.
 
 ## For invited clients

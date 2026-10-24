@@ -14,6 +14,7 @@ import json
 import os
 import random
 import signal
+import socket
 import stat
 import sys
 import tempfile
@@ -188,7 +189,7 @@ def main() -> int:
             except Rejected as error:
                 raise ClientError(str(error)) from None
             print(f'Enrolling with {server}…')
-            result = api(server, '/v1/enroll', {'invite': invite})
+            result = api(server, '/v1/enroll', {'invite': invite, 'device_hostname': socket.gethostname()})
             if not all(isinstance(result.get(k), str) for k in ('device_id', 'device_secret', 'hostname')):
                 raise ClientError('Invalid enrollment response; ask the administrator for a new invite')
             enrollment: DeviceConfig = {

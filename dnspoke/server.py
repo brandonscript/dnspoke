@@ -89,7 +89,8 @@ def create_app(store: Store | None = None, provider: DNSProvider | None = None) 
     @app.post('/v1/enroll')
     def enroll() -> Response:
         store.throttle('enroll', request.remote_addr, 10, 900)
-        return jsonify(store.enroll(body().get('invite')))
+        data = body()
+        return jsonify(store.enroll(data.get('invite'), data.get('device_hostname')))
 
     @app.post('/v1/token')
     def token() -> Response:

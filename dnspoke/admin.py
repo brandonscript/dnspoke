@@ -1,4 +1,5 @@
 """Local-only operator commands; run inside the service container."""
+from datetime import datetime, timezone
 import argparse
 import json
 import os
@@ -36,9 +37,13 @@ def run(args: argparse.Namespace) -> int:
             print('Device revoked, including outstanding update tokens')
         else:
             with store.transaction() as db:
-                query = ('SELECT id,hostname,revoked,last_ip,last_update,created FROM devices ORDER BY created'
+                query = ('SELECT id,hostname,device_hostname,revoked,last_ip,last_update,created FROM devices ORDER BY created'
                          if args.admin_command == 'devices' else 'SELECT * FROM audit ORDER BY at DESC LIMIT 100')
-                print(json.dumps([dict(row) for row in db.execute(query)], indent=2))
+                rows = [dict(row) for row in db.execute(query)]
+                if args.admin_command == 'devices':
+                    for row in rows:
+                        row['registered_at'] = datetime.fromtimestamp(row['created'], timezone.utc).isoformat()
+                print(json.dumps(rows, indent=2))
     except (Rejected, KeyError) as error:
         print(str(error), file=sys.stderr)
         return 1

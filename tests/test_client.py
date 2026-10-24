@@ -107,6 +107,7 @@ def test_visible_or_positional_invite(tmp_path: Path,monkeypatch: pytest.MonkeyP
     path=tmp_path/'client/device.json'
     invitation=pack_invite('https://dns.example.com','ab'*12)
     argv=['dnspoke','--config',str(path),'enroll']
+    monkeypatch.setattr('socket.gethostname', lambda: 'test-laptop.local')
     prompts=[]
     if positional:argv.append(invitation)
     def visible(prompt: str) -> str:
@@ -116,7 +117,7 @@ def test_visible_or_positional_invite(tmp_path: Path,monkeypatch: pytest.MonkeyP
     monkeypatch.setattr('sys.argv',argv)
     def api(server: str,route: str,data: dict[str, object] | None=None,credential: str | None=None) -> dict[str, object]:
         assert server=='https://dns.example.com'
-        assert data=={'invite':'ab'*12}
+        assert data=={'invite':'ab'*12, 'device_hostname': 'test-laptop.local'}
         return {'hostname':'alice.example.com','device_id':'test-device','device_secret':'y'*43}
     monkeypatch.setattr(cli,'api',api)
     assert cli.main()==0
