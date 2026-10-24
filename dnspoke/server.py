@@ -15,6 +15,7 @@ from werkzeug.wrappers import Response
 from .core import Store, Rejected, digest, public_ipv4
 from .provider import LexiconProvider
 from .types import DNSProvider
+from .settings import relay_url
 
 if TYPE_CHECKING:
     from _typeshed.wsgi import StartResponse, WSGIEnvironment
@@ -23,6 +24,8 @@ def create_app(store: Store | None = None, provider: DNSProvider | None = None) 
     app = Flask(__name__)
     app.config['MAX_CONTENT_LENGTH'] = 2048
     store = store or Store(os.environ.get('DNS_DATABASE', '/data/state.sqlite3'))
+    endpoint = relay_url(store, os.environ['DNS_ZONE'], os.environ.get('RELAY_PUBLIC_URL'))
+    app.logger.info('Relay URL: %s', endpoint)
     provider = provider or LexiconProvider(os.environ['DNS_ZONE'], os.environ.get('DNS_PROVIDER'))
     try:
         provider_cooldown = int(os.environ.get('DNS_PROVIDER_COOLDOWN', '0'))

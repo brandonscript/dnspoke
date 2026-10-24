@@ -20,7 +20,7 @@ DNS_ZONE=example.com
 DNS_PROVIDER=your_provider
 ```
 
-`RELAY_PUBLIC_URL` is where the relay is hosted. `DNS_ZONE` is the zone it manages. Configure these once; each invite includes the relay address automatically.
+`RELAY_PUBLIC_URL` is where the relay is hosted. Omit it to generate and save a random eight-character hex hostname on first startup; run `dnspoke admin endpoint` inside the server container to see it. Use `dnspoke admin endpoint --enroll-at HOSTNAME` to save a custom address when no environment override is set. `DNS_ZONE` is the zone it manages. Configure these once; each invite includes the relay address automatically.
 
 Connect the service to your HTTPS proxy's Docker network, set its trusted proxy address in `.env`, then start it:
 

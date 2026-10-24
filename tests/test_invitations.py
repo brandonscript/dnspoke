@@ -47,15 +47,15 @@ def test_admin_uses_configured_instance_and_scopes_invite(tmp_path: Path,monkeyp
     assert Store(tmp_path/'state.sqlite3').enroll(secret)['hostname']=='alice.example.com'
 
 
-def test_missing_server_config_does_not_issue_invite(tmp_path: Path,monkeypatch: pytest.MonkeyPatch,capsys: pytest.CaptureFixture[str]) -> None:
+def test_missing_server_config_uses_saved_random_endpoint(tmp_path: Path,monkeypatch: pytest.MonkeyPatch,capsys: pytest.CaptureFixture[str]) -> None:
     monkeypatch.setenv('DNS_DATABASE',str(tmp_path/'state.sqlite3'))
     monkeypatch.setenv('DNS_ZONE','example.com')
     monkeypatch.delenv('RELAY_PUBLIC_URL',raising=False)
     monkeypatch.setattr('sys.argv',['dnspoke','admin','invite','alice'])
-    assert cli.main()==1
-    assert 'RELAY_PUBLIC_URL' in capsys.readouterr().err
-    with Store(tmp_path/'state.sqlite3').transaction() as db:
-        assert db.execute('SELECT count(*) FROM invites').fetchone()[0]==0
+    assert cli.main()==0
+    output = capsys.readouterr().out
+    from dnspoke.settings import relay_url
+    assert relay_url(Store(tmp_path/'state.sqlite3'), 'example.com') in output
 
 
 def test_invite_entropy_single_use_and_credential_exchange(tmp_path: Path) -> None:
@@ -138,12 +138,14 @@ def test_cli_extended_invites_require_yolo(tmp_path: Path, monkeypatch: pytest.M
 
 
 @pytest.mark.parametrize('label', [None, 'enroll'])
-def test_endpoint_suggests_random_or_chosen_label(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], label: str | None) -> None:
+def test_endpoint_suggests_random_or_chosen_label(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], label: str | None) -> None:
     import re
     monkeypatch.setenv('DNS_ZONE', 'example.com')
+    monkeypatch.setenv('DNS_DATABASE', str(tmp_path / 'state.sqlite3'))
+    monkeypatch.delenv('RELAY_PUBLIC_URL', raising=False)
     argv = ['dnspoke', 'admin', 'endpoint']
     if label:
-        argv += ['--label', label]
+        argv += ['--enroll-at', label]
     monkeypatch.setattr('sys.argv', argv)
     assert cli.main() == 0
     url = capsys.readouterr().out.strip()

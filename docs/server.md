@@ -7,7 +7,7 @@ The relay uses DNS Lexicon to manage records. Select your provider and keep its 
 Install the server dependencies with Python 3.12 or later:
 
 ```sh
-python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.4'
+python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.5'
 ```
 
 Run the server with the Gunicorn command in the [Dockerfile](../Dockerfile). Set the environment variables below and make the database directory writable by the service user. Run `dnspoke admin` on that server with the same environment and database. Client-only installations need no server dependencies and also include the local admin commands.
@@ -18,7 +18,7 @@ Copy `.env.example` to `.env` and restrict it with `chmod 600 .env`.
 
 | Setting | Purpose | Default |
 | --- | --- | --- |
-| `RELAY_PUBLIC_URL` | Public HTTPS origin clients use for enrollment and updates | Required for invitations |
+| `RELAY_PUBLIC_URL` | Public HTTPS origin clients use for enrollment and updates | Generated and saved on first startup |
 | `DNS_ZONE` | DNS zone managed by this instance | Required |
 | `DNS_PROVIDER` | Lexicon provider identifier | Required |
 | `DNS_PROVIDER_COOLDOWN` | Minimum seconds between provider operations, including failed attempts | `0` |
@@ -37,14 +37,14 @@ docker compose -f compose.example.yml up -d --force-recreate
 
 ## Choosing the relay address
 
-The relay address is configurable through `RELAY_PUBLIC_URL`. To suggest a random eight-character hex hostname under `DNS_ZONE`, run:
+On its first startup, the server generates a random eight-character hex hostname under `DNS_ZONE` and saves it in the database. Restarts keep the same hostname. To see it, run:
 
 ```sh
 dnspoke admin endpoint
 # https://a1b2c3d4.example.com
 ```
 
-Use `--label enroll` to choose a label instead. Save the chosen URL once in the server environment, create its DNS record, and configure the HTTPS proxy for it. The command only suggests a name; it does not change DNS or configuration. Running it again generates another suggestion. Underscores cannot be used in public HTTPS certificate hostnames. Random labels obscure the address but are not access controls, and certificates may disclose them through [certificate transparency](https://letsencrypt.org/docs/ct-logs/).
+Use `dnspoke admin endpoint --enroll-at enroll.example.com` to save a chosen hostname instead; a single label or HTTPS origin also works. `RELAY_PUBLIC_URL` overrides the saved value when set. Create the corresponding DNS record and configure the HTTPS proxy before sharing invites; hostname selection does not provision either. Changing the relay address requires updating the proxy and existing clients. Underscores cannot be used in public HTTPS certificate hostnames. Random labels obscure the address but are not access controls, and certificates may disclose them through [certificate transparency](https://letsencrypt.org/docs/ct-logs/).
 
 ## HTTPS proxy
 
