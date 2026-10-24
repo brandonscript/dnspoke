@@ -1,4 +1,4 @@
-"""Invite enrollment, manual updates, and background polling. Python stdlib only."""
+"""Dynamic DNS enrollment, updates, and local server administration."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -20,7 +20,7 @@ import tempfile
 import threading
 import time
 
-from . import __version__
+from . import __version__, admin
 from .core import Rejected
 from .invitations import unpack_invite
 from .types import DeviceConfig
@@ -158,6 +158,7 @@ def main() -> int:
     parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('--config', type=Path, default=default)
     commands = parser.add_subparsers(dest='command', required=True)
+    admin.configure_parser(commands.add_parser('admin', help='Manage this server using its local database and environment'))
     enroll = commands.add_parser('enroll', help='Exchange a one-time invite for this device')
     enroll.add_argument('invite', nargs='?', help='Complete invite code; prompts visibly when omitted')
     send = commands.add_parser('update', help='Report a changed public IPv4 address')
@@ -171,6 +172,8 @@ def main() -> int:
     period.add_argument('--ttl', type=int, metavar='MINUTES', help='Override saved check period in minutes (minimum 5)')
     period.add_argument('--interval', type=int, metavar='SECONDS', help='Legacy override in seconds (minimum 300)')
     args = parser.parse_args()
+    if args.command == 'admin':
+        return admin.run(args)
     try:
         if args.command == 'enroll':
             if args.config.exists():

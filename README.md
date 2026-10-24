@@ -30,10 +30,12 @@ docker compose -f compose.example.yml up -d --build
 
 See [server configuration](docs/server.md) for the network, credentials, storage, and proxy setup.
 
+The same CLI includes client and local admin commands. Homebrew installs it without server dependencies; the Docker image includes the full relay server. Administration requires access to the server database and environment.
+
 ### 2. Invite a client
 
 ```sh
-docker compose -f compose.example.yml exec dnspoke dnspoke-admin invite alice
+docker compose -f compose.example.yml exec dnspoke dnspoke admin invite alice
 ```
 
 This grants access to `alice.example.com` only. Example output:
@@ -52,9 +54,9 @@ Invites expire after 15 minutes and can be used once. Use `invite alice --ttl 60
 ### 3. Manage access
 
 ```sh
-docker compose -f compose.example.yml exec dnspoke dnspoke-admin devices
-docker compose -f compose.example.yml exec dnspoke dnspoke-admin revoke DEVICE_ID
-docker compose -f compose.example.yml exec dnspoke dnspoke-admin audit
+docker compose -f compose.example.yml exec dnspoke dnspoke admin devices
+docker compose -f compose.example.yml exec dnspoke dnspoke admin revoke DEVICE_ID
+docker compose -f compose.example.yml exec dnspoke dnspoke admin audit
 ```
 
 One active device is allowed per hostname. Revoke a device before replacing it. Revocation disables its credential and outstanding update tokens; the DNS record stays in place.
@@ -98,7 +100,7 @@ brew services restart dnspoke
 
 Run Homebrew services as your user, without `sudo`. Stop with `brew services stop dnspoke`. For foreground use, run `dnspoke watch --ttl 15`.
 
-For client commands, `--ttl` is the polling interval in minutes, with a minimum of five. For `dnspoke-admin invite`, it is the invite lifetime in seconds.
+For client commands, `--ttl` is the polling interval in minutes, with a minimum of five. For `dnspoke admin invite`, it is the invite lifetime in seconds.
 
 ## Details
 

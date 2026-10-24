@@ -26,3 +26,4 @@ jobs:
       - run: python -m pip install .
       - run: dnspoke --version
       - run: dnspoke --help
+      - run: dnspoke admin --help

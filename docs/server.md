@@ -2,6 +2,16 @@
 
 The relay uses DNS Lexicon to manage records. Select your provider and keep its credentials on the server. Clients receive permission to update one hostname, not access to the provider account.
 
+## Installing without Docker
+
+Install the server dependencies with Python 3.12 or later:
+
+```sh
+python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.1'
+```
+
+Run the server with the Gunicorn command in the [Dockerfile](../Dockerfile). Set the environment variables below and make the database directory writable by the service user. Run `dnspoke admin` on that server with the same environment and database. Client-only installations need no server dependencies and also include the local admin commands.
+
 ## Environment
 
 Copy `.env.example` to `.env` and restrict it with `chmod 600 .env`.

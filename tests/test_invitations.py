@@ -5,7 +5,7 @@ import base64
 
 import pytest
 
-from dnspoke import admin
+from dnspoke import cli
 from dnspoke.core import Rejected
 from dnspoke.core import Store
 from dnspoke.invitations import pack_invite, unpack_invite
@@ -39,8 +39,8 @@ def test_admin_uses_configured_instance_and_scopes_invite(tmp_path: Path,monkeyp
     monkeypatch.setenv('DNS_DATABASE',str(tmp_path/'state.sqlite3'))
     monkeypatch.setenv('DNS_ZONE','example.com')
     monkeypatch.setenv('RELAY_PUBLIC_URL','https://dns.example.com')
-    monkeypatch.setattr('sys.argv',['dnspoke-admin','invite','alice'])
-    assert admin.main()==0
+    monkeypatch.setattr('sys.argv',['dnspoke','admin','invite','alice'])
+    assert cli.main()==0
     token=capsys.readouterr().out.split('One-time invite (share privately): ')[1].strip()
     server,secret=unpack_invite(token)
     assert server=='https://dns.example.com'
@@ -51,8 +51,8 @@ def test_missing_server_config_does_not_issue_invite(tmp_path: Path,monkeypatch:
     monkeypatch.setenv('DNS_DATABASE',str(tmp_path/'state.sqlite3'))
     monkeypatch.setenv('DNS_ZONE','example.com')
     monkeypatch.delenv('RELAY_PUBLIC_URL',raising=False)
-    monkeypatch.setattr('sys.argv',['dnspoke-admin','invite','alice'])
-    assert admin.main()==1
+    monkeypatch.setattr('sys.argv',['dnspoke','admin','invite','alice'])
+    assert cli.main()==1
     assert 'RELAY_PUBLIC_URL' in capsys.readouterr().err
     with Store(tmp_path/'state.sqlite3').transaction() as db:
         assert db.execute('SELECT count(*) FROM invites').fetchone()[0]==0
@@ -84,3 +84,21 @@ def test_bad_binary_invite_rejected(payload: bytes) -> None:
 def test_unknown_version_rejected_explicitly() -> None:
     with pytest.raises(Rejected,match='Unsupported invite version'):
         unpack_invite(encoded(b'3/'+b'x'*12+b'dns.example.com'))
+
+
+def test_admin_device_management_through_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    database = tmp_path / 'state.sqlite3'
+    monkeypatch.setenv('DNS_DATABASE', str(database))
+    store = Store(database)
+    device = store.enroll(store.invite('alice.example.com'))
+    monkeypatch.setattr('sys.argv', ['dnspoke', 'admin', 'devices'])
+    assert cli.main() == 0
+    assert device['device_id'] in capsys.readouterr().out
+    monkeypatch.setattr('sys.argv', ['dnspoke', 'admin', 'revoke', device['device_id']])
+    assert cli.main() == 0
+    assert 'Device revoked' in capsys.readouterr().out
+    with pytest.raises(Rejected):
+        store.token(device['device_secret'])
+    monkeypatch.setattr('sys.argv', ['dnspoke', 'admin', 'audit'])
+    assert cli.main() == 0
+    assert capsys.readouterr().out.strip() == '[]'
