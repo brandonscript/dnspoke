@@ -71,11 +71,12 @@ Open a new PowerShell window, then download and run the installer:
 ```powershell
 Invoke-WebRequest https://raw.githubusercontent.com/brandonscript/dnspoke/v0.1.6/install.ps1 -OutFile install.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+$env:Path = "$env:LOCALAPPDATA\Programs\dnspoke\bin;$env:Path"
 dnspoke enroll
 dnspoke update
 ```
 
-This uses a process-level execution policy for the installer and does not change your machine's policy. Run as your normal user. The installer creates an isolated environment and command under `%LOCALAPPDATA%\dnspoke`, adds its `bin` directory to your user PATH, and leaves enrollment intact when rerun. Open a new terminal if another application has not picked up the PATH change. Use `-Python C:\path\to\python.exe`, `-InstallDir DIR`, or `-Version vX.Y.Z` when needed. `-NoPath` leaves PATH unchanged.
+This uses a process-level execution policy for the installer and does not change your machine's policy. Run as your normal user. The installer creates an isolated environment and command under `%LOCALAPPDATA%\Programs\dnspoke`, adds its `bin` directory to your user PATH, and leaves enrollment intact when rerun. Open a new terminal if another application has not picked up the PATH change. Use `-Python C:\path\to\python.exe`, `-InstallDir DIR`, or `-Version vX.Y.Z` when needed. `-NoPath` leaves PATH unchanged.
 
 The default credential file is `%LOCALAPPDATA%\dnspoke\device.json`. The client creates a private directory and file ACL for your Windows user and checks those permissions when reading credentials. Store the config on a filesystem that supports Windows ACLs. An explicit `--config` or `XDG_CONFIG_HOME` overrides the default location.
 
@@ -85,7 +86,7 @@ Run `dnspoke watch` in PowerShell for foreground use. To start it automatically,
 
 - Use your normal Windows user, select **Run only when user is logged on**, and leave **Run with highest privileges** unchecked.
 - Trigger it **At log on** for that user.
-- Set the program to the full path of `%LOCALAPPDATA%\dnspoke\venv\Scripts\pythonw.exe` and the arguments to `-m dnspoke.cli watch`. Expand `%LOCALAPPDATA%` to your actual directory when entering the path.
+- Set the program to the full path of `%LOCALAPPDATA%\Programs\dnspoke\venv\Scripts\pythonw.exe` and the arguments to `-m dnspoke.cli watch`. Expand `%LOCALAPPDATA%` to your actual directory when entering the path.
 - Disable the task's execution time limit, allow it on battery if appropriate, and choose **Do not start a new instance** if it is already running.
 
 `pythonw.exe` runs without a console window. Use `dnspoke update` in PowerShell to troubleshoot errors interactively. End the task before upgrading and run it again afterward. Background operation while logged out and running as a Windows system service are not configured by this installer.

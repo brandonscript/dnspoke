@@ -2,7 +2,7 @@
 param(
     [ValidatePattern('^v[0-9]+\.[0-9]+\.[0-9]+$')]
     [string]$Version = 'v0.1.6',
-    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'dnspoke'),
+    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\dnspoke'),
     [string]$Python,
     [string]$Source,
     [switch]$NoPath
@@ -17,7 +17,9 @@ if (-not $Python) {
         if (-not $command) { continue }
         $candidateArgs = @()
         if ($candidate -eq 'py') { $candidateArgs = @('-3') }
-        & $command.Source @candidateArgs -c 'import ssl, venv, sys; sys.exit(sys.version_info < (3, 12))' 2>$null
+        try {
+            & $command.Source @candidateArgs -c 'import ssl, venv, sys; sys.exit(sys.version_info < (3, 12))' 2>$null
+        } catch { continue }
         if ($LASTEXITCODE -eq 0) {
             $Python = $command.Source
             $pythonArgs = $candidateArgs
