@@ -49,6 +49,55 @@ dns.example.com {
 
 The proxy must replace untrusted forwarded headers. Configure a public DNS record for the relay and verify its HTTPS certificate before sharing invites. `/health` is an internal liveness endpoint.
 
+### Nginx and Let's Encrypt
+
+Nginx can terminate HTTPS and forward requests to dnspoke. Point your relay hostname (for example, `dns.example.com`) at the proxy's public address and allow inbound TCP ports 80 and 443. Any published AAAA record must also reach this proxy.
+
+For Nginx running on the host, publish the relay port only on loopback by adding this to the `dnspoke` service in your Compose file:
+
+```yaml
+ports:
+  - "127.0.0.1:8090:8090"
+```
+
+Keep `DNS_TRUST_PROXY=1` and set `DNS_TRUSTED_PROXY` to the source address the relay actually sees from Nginx. With Docker port forwarding this may be the bridge gateway, rather than `127.0.0.1`. For a containerized proxy, use a fixed address on the shared Docker network instead and forward directly to `dnspoke:8090`, without publishing the port.
+
+Start with an HTTP server block in your Nginx configuration, inside the `http` context (often an included site file):
+
+```nginx
+server {
+    listen 80;
+    server_name dns.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 90s;
+    }
+}
+```
+
+This example assumes Nginx is the public edge proxy. Overwrite `X-Forwarded-For` as shown so clients cannot choose the address used for DNS updates. An additional CDN or load balancer requires configuring Nginx's [real IP module](https://nginx.org/en/docs/http/ngx_http_realip_module.html) to trust only that upstream's addresses first.
+
+Validate and reload Nginx, then install Certbot and its Nginx plugin using the [official instructions for your operating system](https://certbot.eff.org/instructions?ws=nginx). On a host installation, the basic flow is:
+
+```sh
+sudo nginx -t
+sudo systemctl reload nginx
+sudo certbot --nginx -d dns.example.com
+sudo certbot renew --dry-run
+```
+
+Choose the HTTP-to-HTTPS redirect when prompted. Certbot obtains a Let's Encrypt certificate and updates the site to listen on port 443 with TLS. Verify `https://dns.example.com/health`, set `RELAY_PUBLIC_URL=https://dns.example.com`, and recreate the relay container before issuing invites. Keep port 80 available for HTTP validation and renewal; [DNS validation](https://letsencrypt.org/docs/challenge-types/) is another option if that is not possible.
+
+Confirm that Certbot's renewal timer or scheduled job is enabled and that successful renewals reload Nginx. For container deployments, Certbot needs access to the validation files and certificate storage, and the proxy needs to reload renewed certificates. The host commands above assume Certbot manages that host's Nginx configuration; follow the [Certbot user guide](https://eff-certbot.readthedocs.io/en/stable/using.html) for webroot validation, deployment hooks, and other layouts.
+
+See Nginx's [HTTPS setup](https://nginx.org/en/docs/http/configuring_https_servers.html) and [proxy header documentation](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_set_header) for the underlying configuration.
+
+[OpenResty](https://openresty.org/en/getting-started.html) is also an option if you already use its Nginx and Lua tooling. The same proxy configuration applies; its official packages use `openresty` in place of the `nginx` command. Plain Nginx with Certbot is sufficient here. OpenResty itself does not automate certificate issuance or renewal, and its binary and configuration paths may require additional Certbot configuration.
+
 ## Storage and backups
 
 The image runs as uid 10001. The named `/data` volume stores the SQLite database and provider cache. For a bind mount, make the directory writable by that uid.
