@@ -1,0 +1,21 @@
+services:
+  dnspoke:
+    build: .
+    restart: unless-stopped
+    environment:
+      DNS_DATABASE: /data/state.sqlite3
+    expose: ["8090"]
+    env_file: .env
+    volumes:
+      - dnspoke-data:/data
+    read_only: true
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [proxy]
+volumes:
+  dnspoke-data:
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:?Set PROXY_NETWORK to your HTTPS proxy network}
