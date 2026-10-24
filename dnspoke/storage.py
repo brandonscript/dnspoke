@@ -12,6 +12,8 @@ class ClientError(Exception):
 
 _WINDOWS_ACL = r'''
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+try {
 $path = $env:DNSPOKE_ACL_PATH
 $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
 if ($env:DNSPOKE_ACL_MODE -eq 'secure') {
@@ -39,12 +41,18 @@ foreach ($rule in $acl.GetAccessRules($true, $true, [System.Security.Principal.S
     }
 }
 if (-not $allowed) { throw 'Credential path must grant access to the current user' }
+} catch {
+    [Console]::Error.WriteLine($_.Exception.Message)
+    exit 1
+}
 '''
 
 
 def windows_acl(path: Path, *, secure: bool = False) -> None:
     shell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
-    environment = dict(os.environ, DNSPOKE_ACL_PATH=str(path.resolve()), DNSPOKE_ACL_MODE='secure' if secure else 'check')
+    # Windows PowerShell must not inherit PowerShell 7's incompatible module paths.
+    environment = {key: value for key, value in os.environ.items() if key.upper() != 'PSMODULEPATH'}
+    environment.update(DNSPOKE_ACL_PATH=str(path.resolve()), DNSPOKE_ACL_MODE='secure' if secure else 'check')
     encoded = base64.b64encode(_WINDOWS_ACL.encode('utf-16-le')).decode('ascii')
     result = subprocess.run([str(shell), '-NoLogo', '-NoProfile', '-NonInteractive', '-OutputFormat', 'Text', '-EncodedCommand', encoded],
                             env=environment, capture_output=True, timeout=30, check=False,

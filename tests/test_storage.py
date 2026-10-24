@@ -49,3 +49,14 @@ def test_windows_rejects_shared_directory_before_enrollment(tmp_path: Path) -> N
     assert result.returncode == 0
     with pytest.raises(cli.ClientError, match='Windows permissions'):
         storage.prepare_directory(directory)
+
+
+def test_acl_subprocess_does_not_inherit_incompatible_modules(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('SystemRoot', str(tmp_path))
+    monkeypatch.setenv('PSModulePath', 'incompatible-modules')
+    def run(command: list[str], *, env: dict[str, str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        assert not any(key.upper() == 'PSMODULEPATH' for key in env)
+        assert env['DNSPOKE_ACL_PATH'] == str(tmp_path.resolve())
+        return subprocess.CompletedProcess(command, 0, stdout=b'', stderr=b'')
+    monkeypatch.setattr(storage.subprocess, 'run', run)
+    storage.windows_acl(tmp_path)
