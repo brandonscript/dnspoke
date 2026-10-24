@@ -49,7 +49,7 @@ One-time invite (share privately): Mi8BI0VniavN7wEjRWdkbnMuZXhhbXBsZS5jb20
 
 The example code is not valid. A real invite contains a random secret and the relay address, both encoded together. Send the complete code privately along with the client instructions below.
 
-Invites expire after 15 minutes and can be used once. Use `invite alice --ttl 600` for a ten-minute invite. To let a client update an existing A record, inspect it first and add `--adopt-existing`.
+Invites expire after 15 minutes and can be used once. Use `invite alice --ttl 600` for a ten-minute invite. Longer invites require explicit opt-in: `invite alice --ttl 86400 --yolo` creates a 24-hour invite, the maximum allowed. To let a client update an existing A record, inspect it first and add `--adopt-existing`.
 
 ### 3. Manage access
 

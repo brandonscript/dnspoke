@@ -130,9 +130,11 @@ class Store:
                 raise Rejected('Too many requests; try again later', 429)
             db.execute('INSERT INTO limits VALUES (?,1,?) ON CONFLICT(bucket) DO UPDATE SET count=count+1', (key, now + period))
 
-    def invite(self, name: str, ttl: int = 900, adopt: bool = False) -> str:
-        if not 60 <= ttl <= 3600:
-            raise Rejected('Invite lifetime must be between 60 and 3600 seconds')
+    def invite(self, name: str, ttl: int = 900, adopt: bool = False, *, yolo: bool = False) -> str:
+        if not 60 <= ttl <= 86400:
+            raise Rejected('Invite lifetime must be between 60 and 86400 seconds (24 hours)')
+        if ttl > 900 and not yolo:
+            raise Rejected('Invites longer than 15 minutes require --yolo')
         secret = secrets.token_hex(12)  # 96-bit, single-use invitation only.
         with self.transaction() as db:
             if db.execute('SELECT 1 FROM devices WHERE hostname=? AND revoked=0', (name,)).fetchone():

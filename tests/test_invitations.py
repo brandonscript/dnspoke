@@ -105,3 +105,49 @@ def test_admin_device_management_through_cli(tmp_path: Path, monkeypatch: pytest
     monkeypatch.setattr('sys.argv', ['dnspoke', 'admin', 'audit'])
     assert cli.main() == 0
     assert capsys.readouterr().out.strip() == '[]'
+
+
+@pytest.mark.parametrize(('ttl', 'yolo', 'allowed'), [(900, False, True), (901, False, False), (3600, False, False), (86400, False, False), (86400, True, True), (86401, True, False), (59, True, False)])
+def test_cli_extended_invites_require_yolo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], ttl: int, yolo: bool, allowed: bool) -> None:
+    monkeypatch.setenv('DNS_DATABASE', str(tmp_path / 'state.sqlite3'))
+    monkeypatch.setenv('DNS_ZONE', 'example.com')
+    monkeypatch.setenv('RELAY_PUBLIC_URL', 'https://dns.example.com')
+    argv = ['dnspoke', 'admin', 'invite', 'alice', '--ttl', str(ttl)]
+    if yolo:
+        argv.append('--yolo')
+    monkeypatch.setattr('sys.argv', argv)
+    assert cli.main() == (0 if allowed else 1)
+    captured = capsys.readouterr()
+    store = Store(tmp_path / 'state.sqlite3')
+    with store.transaction() as db:
+        row = db.execute('SELECT expires FROM invites').fetchone()
+    if not allowed:
+        assert row is None
+        assert 'One-time invite' not in captured.out
+        if 900 < ttl <= 86400:
+            assert '--yolo' in captured.err
+    else:
+        import time
+        assert row is not None
+        assert time.time() + ttl - 5 <= row['expires'] <= time.time() + ttl
+        code = captured.out.split('One-time invite (share privately): ')[1].strip()
+        _, secret = unpack_invite(code)
+        store.enroll(secret)
+        with pytest.raises(Rejected):
+            store.enroll(secret)
+
+
+@pytest.mark.parametrize('label', [None, 'enroll'])
+def test_endpoint_suggests_random_or_chosen_label(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], label: str | None) -> None:
+    import re
+    monkeypatch.setenv('DNS_ZONE', 'example.com')
+    argv = ['dnspoke', 'admin', 'endpoint']
+    if label:
+        argv += ['--label', label]
+    monkeypatch.setattr('sys.argv', argv)
+    assert cli.main() == 0
+    url = capsys.readouterr().out.strip()
+    if label:
+        assert url == 'https://enroll.example.com'
+    else:
+        assert re.fullmatch(r'https://[0-9a-f]{8}\.example\.com', url)

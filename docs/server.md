@@ -7,7 +7,7 @@ The relay uses DNS Lexicon to manage records. Select your provider and keep its 
 Install the server dependencies with Python 3.12 or later:
 
 ```sh
-python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.3'
+python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.4'
 ```
 
 Run the server with the Gunicorn command in the [Dockerfile](../Dockerfile). Set the environment variables below and make the database directory writable by the service user. Run `dnspoke admin` on that server with the same environment and database. Client-only installations need no server dependencies and also include the local admin commands.
@@ -34,6 +34,17 @@ Add the exact `LEXICON_<PROVIDER>_*` credential variables required by your provi
 ```sh
 docker compose -f compose.example.yml up -d --force-recreate
 ```
+
+## Choosing the relay address
+
+The relay address is configurable through `RELAY_PUBLIC_URL`. To suggest a random eight-character hex hostname under `DNS_ZONE`, run:
+
+```sh
+dnspoke admin endpoint
+# https://a1b2c3d4.example.com
+```
+
+Use `--label enroll` to choose a label instead. Save the chosen URL once in the server environment, create its DNS record, and configure the HTTPS proxy for it. The command only suggests a name; it does not change DNS or configuration. Running it again generates another suggestion. Underscores cannot be used in public HTTPS certificate hostnames. Random labels obscure the address but are not access controls, and certificates may disclose them through [certificate transparency](https://letsencrypt.org/docs/ct-logs/).
 
 ## HTTPS proxy
 
@@ -106,7 +117,7 @@ Back up the volume privately. It contains hashed credentials, assigned hostnames
 
 ## Invitations and existing records
 
-An invite is valid for 15 minutes by default. `--ttl` accepts 60–3600 seconds. A replacement invite invalidates the previous unused invite for that hostname.
+An invite is valid for 15 minutes by default. `--ttl` accepts 60–86400 seconds (up to 24 hours). Lifetimes over 900 seconds require `--yolo`; for example, `dnspoke admin invite alice --ttl 86400 --yolo`. A replacement invite invalidates the previous unused invite for that hostname.
 
 Without `--adopt-existing`, a device can create its assigned record but cannot take over an existing one. With that option, it may update the exact single A record for its hostname. Conflicting types or multiple exact records require administrator attention. Infrastructure labels such as `mail`, `dns`, and `auth` are reserved.
 
