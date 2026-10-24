@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 import os
 
 import pytest
@@ -148,7 +149,7 @@ def test_watch_uses_saved_period_even_after_errors(tmp_path: Path,monkeypatch: p
         def set(self) -> None:self.stopped=True
         def wait(self,seconds: float) -> None:waits.append(seconds);self.stopped=True
     stop=Stop()
-    monkeypatch.setattr('dnspoke.cli.threading.Event',lambda:stop)
+    monkeypatch.setattr('dnspoke.cli.threading', SimpleNamespace(Event=lambda: stop))
     monkeypatch.setattr('dnspoke.cli.signal.signal',lambda *args:None)
     monkeypatch.setattr('dnspoke.cli.random.uniform',lambda *args:0)
     def update(path: Path) -> None:
