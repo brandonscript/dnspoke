@@ -4,13 +4,22 @@ The relay uses DNS Lexicon to manage records. Select your provider and keep its 
 
 ## Installing without Docker
 
+Native server hosting supports macOS and Linux. The [shell installer](install.md#hosting-a-server-on-macos-or-linux) accepts `--server`, or you can use a Python virtual environment:
+
 Install the server dependencies with Python 3.12 or later:
 
 ```sh
-python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.5'
+python3 -m venv .venv
+.venv/bin/python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.6'
 ```
 
-Run the server with the Gunicorn command in the [Dockerfile](../Dockerfile). Set the environment variables below and make the database directory writable by the service user. Run `dnspoke admin` on that server with the same environment and database. Client-only installations need no server dependencies and also include the local admin commands.
+Set `DNS_DATABASE` to a writable file, for example `$HOME/.local/share/dnspoke/server/state.sqlite3`, and `TLDEXTRACT_CACHE_PATH` to a writable cache directory. The Docker default `/data/state.sqlite3` is intended for a mounted volume. After configuring the environment, start the native server with:
+
+```sh
+.venv/bin/gunicorn --bind 127.0.0.1:8090 --workers 1 --threads 1 --timeout 90 'dnspoke.server:create_app()'
+```
+
+Use `~/.local/share/dnspoke/venv/bin/gunicorn` instead for a shell installation. The single worker/thread settings match the [Dockerfile](../Dockerfile). Keep the listener internal and put your HTTPS proxy in front. Native hosting with a local proxy normally sets `DNS_TRUSTED_PROXY=127.0.0.1`. The `--bind` address is not the public relay URL. Set the environment variables below and make the database directory writable by the service user. Run `dnspoke admin` on that server with the same environment and database. Client-only installations need no server dependencies and also include the local admin commands.
 
 ## Environment
 

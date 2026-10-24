@@ -4,7 +4,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
-import subprocess
+from datetime import datetime, timedelta, timezone
+import ipaddress
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 import threading
 
 from flask import redirect
@@ -30,9 +36,18 @@ class DNS:
 
 def test_https_enroll_update_revoke_and_refuse_redirects(tmp_path: Path,monkeypatch: pytest.MonkeyPatch,capsys: pytest.CaptureFixture[str]) -> None:
     key,cert=tmp_path/'key.pem',tmp_path/'cert.pem'
-    subprocess.run(['openssl','req','-x509','-newkey','ec','-pkeyopt','ec_paramgen_curve:prime256v1',
-                    '-nodes','-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost',
-                    '-keyout',str(key),'-out',str(cert)],check=True,capture_output=True)
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'localhost')])
+    now = datetime.now(timezone.utc)
+    certificate = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject)
+                   .public_key(private_key.public_key()).serial_number(x509.random_serial_number())
+                   .not_valid_before(now - timedelta(minutes=1)).not_valid_after(now + timedelta(days=1))
+                   .add_extension(x509.SubjectAlternativeName([x509.DNSName('localhost'),
+                                  x509.IPAddress(ipaddress.ip_address('127.0.0.1'))]), critical=False)
+                   .sign(private_key, hashes.SHA256()))
+    key.write_bytes(private_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                             serialization.NoEncryption()))
+    cert.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
     monkeypatch.setenv('SSL_CERT_FILE',str(cert))
     monkeypatch.delenv('DNS_TRUST_PROXY',raising=False)
     store=Store(tmp_path/'state.sqlite3')

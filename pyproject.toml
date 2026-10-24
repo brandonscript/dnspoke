@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dnspoke"
-version = "0.1.5"
+version = "0.1.6"
 description = "Self-hosted dynamic DNS with hostname-scoped invitations"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -17,7 +17,7 @@ Issues = "https://github.com/brandonscript/dnspoke/issues"
 
 [project.optional-dependencies]
 server = ["Flask>=3.1,<4", "gunicorn>=23,<24", "dns-lexicon>=3.17,<4"]
-test = ["pytest>=8,<10"]
+test = ["pytest>=8,<10", "Flask>=3.1,<4", "cryptography>=44"]
 typecheck = ["mypy>=1.15,<2", "types-requests"]
 
 [project.scripts]

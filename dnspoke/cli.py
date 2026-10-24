@@ -15,7 +15,6 @@ import os
 import random
 import signal
 import socket
-import stat
 import sys
 import tempfile
 import threading
@@ -25,9 +24,7 @@ from . import __version__, admin
 from .core import Rejected
 from .invitations import unpack_invite
 from .types import DeviceConfig
-
-class ClientError(Exception):
-    pass
+from .storage import ClientError as ClientError, check_path, config_path, prepare_directory, secure_file
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -84,9 +81,8 @@ def api(server: str, path: str, data: Mapping[str, object] | None = None, creden
 
 
 def read_config(path: Path) -> DeviceConfig:
-    info = path.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
-        raise ClientError('Credential file must be owned by you, regular, and mode 600')
+    check_path(path.parent, directory=True)
+    check_path(path)
     try:
         value = json.loads(path.read_text())
         server_url(value['server'])
@@ -98,15 +94,14 @@ def read_config(path: Path) -> DeviceConfig:
 
 
 def write_config(path: Path, config: Mapping[str, object]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if path.parent.stat().st_uid != os.getuid() or path.parent.stat().st_mode & 0o077:
-        raise ClientError('Credential directory must be owned by you and mode 700')
+    prepare_directory(path.parent)
     fd, temporary = tempfile.mkstemp(prefix='.device-', dir=path.parent)
     try:
         with os.fdopen(fd, 'w') as stream:
             json.dump(config, stream, indent=2)
             stream.flush()
             os.fsync(stream.fileno())
+        secure_file(Path(temporary))
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
@@ -192,7 +187,7 @@ def polling_interval(config: Mapping[str, object], minutes: int | None = None, s
 
 
 def main() -> int:
-    default = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'dnspoke/device.json'
+    default = config_path()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('--config', type=Path, default=default)
@@ -220,9 +215,7 @@ def main() -> int:
             if args.config.exists():
                 raise ClientError('Already enrolled; use a separate --config or ask the administrator to revoke the old device')
             # Check local storage before consuming the one-use invite.
-            args.config.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            if args.config.parent.stat().st_mode & 0o077:
-                raise ClientError('Credential directory must be mode 700')
+            prepare_directory(args.config.parent)
             invite = (args.invite if args.invite is not None else input('One-time invite: ')).strip()
             try:
                 server, invite = unpack_invite(invite)

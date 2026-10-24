@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 import pytest
 
@@ -13,7 +14,8 @@ def local_route(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def config(tmp_path: Path) -> Path:
     directory=tmp_path / 'private'
-    directory.mkdir(mode=0o700)
+    from dnspoke.storage import prepare_directory
+    prepare_directory(directory)
     path=directory / 'device.json'
     cli.write_config(path, {'server':'https://dns.example.com','hostname':'alice.example.com','device_secret':'x'*43})
     return path
@@ -21,13 +23,15 @@ def config(tmp_path: Path) -> Path:
 
 def test_credentials_are_private_and_status_does_not_print_secret(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     path=config(tmp_path)
-    assert path.stat().st_mode & 0o777 == 0o600
+    if os.name != 'nt':
+        assert path.stat().st_mode & 0o777 == 0o600
     monkeypatch.setattr('sys.argv',['dnspoke','--config',str(path),'status'])
     assert cli.main()==0
     assert 'x'*43 not in capsys.readouterr().out
-    path.chmod(0o644)
-    with pytest.raises(cli.ClientError):
-        cli.read_config(path)
+    if os.name != 'nt':
+        path.chmod(0o644)
+        with pytest.raises(cli.ClientError):
+            cli.read_config(path)
 
 
 @pytest.mark.parametrize('value',['https://[','http://dns.example.com','https://user:pass@dns.example.com','https://dns.example.com/x','https://dns.example.com?token=x','https://dns.example.com#x'])

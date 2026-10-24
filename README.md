@@ -67,10 +67,14 @@ One active device is allowed per hostname. Revoke a device before replacing it. 
 
 ### Install and enroll
 
+On macOS and Linux, Homebrew is the primary installation method:
+
 ```sh
 brew install brandonscript/tap/dnspoke
 dnspoke enroll
 ```
+
+On Windows, use the [PowerShell installer](docs/install.md#windows-powershell-installer). Linux users without Homebrew can use [install.sh](docs/install.md#linux-shell-installer). Both installers require Python 3.12+ and preserve existing enrollment when upgraded.
 
 Paste the invite when prompted, or pass it directly:
 
@@ -118,7 +122,7 @@ dnspoke configure --ttl 15
 brew services restart dnspoke
 ```
 
-Run Homebrew services as your user, without `sudo`. Stop with `brew services stop dnspoke`. For foreground use, run `dnspoke watch --ttl 15`.
+Run Homebrew services as your user, without `sudo`. Stop with `brew services stop dnspoke`. For foreground use on any supported client platform, run `dnspoke watch --ttl 15`. Script installations can use [systemd or Windows Task Scheduler](docs/install.md) for automatic startup.
 
 For client commands, `--ttl` is the polling interval in minutes, with a minimum of five. For `dnspoke admin invite`, it is the invite lifetime in seconds.
 
@@ -126,11 +130,11 @@ For client commands, `--ttl` is the polling interval in minutes, with a minimum 
 
 - Only public IPv4 A records are supported. The address is the one the relay sees, so VPNs and outbound proxies affect it.
 - Updates are restricted to the assigned hostname. Wildcards, other records, and the zone apex are left alone.
-- Device credentials are stored in `~/.config/dnspoke/device.json`, or under `$XDG_CONFIG_HOME`. The file must be mode 600 and its directory mode 700.
+- Device credentials are stored in `~/.config/dnspoke/device.json` on macOS/Linux or `%LOCALAPPDATA%\dnspoke\device.json` on Windows. `XDG_CONFIG_HOME` overrides the base directory. Unix permissions must be file 600/directory 700; Windows uses a private ACL for your user.
 - The client skips unchanged addresses and reconciles DNS on the first check after 24 hours. Failed updates retry with backoff.
 - DNS updates do not configure router forwarding, firewall rules, or TLS for the hostname.
 
-[Server configuration](docs/server.md) · [Protocol and limits](docs/technical.md) · [Development](docs/development.md)
+[Installation](docs/install.md) · [Server configuration](docs/server.md) · [Protocol and limits](docs/technical.md) · [Development](docs/development.md)
 
 ## License
 
