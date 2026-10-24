@@ -46,11 +46,12 @@ def windows_acl(path: Path, *, secure: bool = False) -> None:
     shell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
     environment = dict(os.environ, DNSPOKE_ACL_PATH=str(path.resolve()), DNSPOKE_ACL_MODE='secure' if secure else 'check')
     encoded = base64.b64encode(_WINDOWS_ACL.encode('utf-16-le')).decode('ascii')
-    result = subprocess.run([str(shell), '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+    result = subprocess.run([str(shell), '-NoLogo', '-NoProfile', '-NonInteractive', '-OutputFormat', 'Text', '-EncodedCommand', encoded],
                             env=environment, capture_output=True, timeout=30, check=False,
                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     if result.returncode:
-        raise ClientError('Credential file and directory must have private Windows permissions for your user')
+        detail = result.stderr.decode('utf-8', errors='replace').strip()
+        raise ClientError('Windows permissions check failed: ' + detail[:2000])
 
 
 def config_path() -> Path:
