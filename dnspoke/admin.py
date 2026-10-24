@@ -37,7 +37,7 @@ def run(args: argparse.Namespace) -> int:
             print('Device revoked, including outstanding update tokens')
         else:
             with store.transaction() as db:
-                query = ('SELECT id,hostname,device_hostname,revoked,last_ip,last_update,created FROM devices ORDER BY created'
+                query = ('SELECT id,hostname,device_hostname,local_ip,revoked,last_ip,last_update,created FROM devices ORDER BY created'
                          if args.admin_command == 'devices' else 'SELECT * FROM audit ORDER BY at DESC LIMIT 100')
                 rows = [dict(row) for row in db.execute(query)]
                 if args.admin_command == 'devices':

@@ -6,8 +6,11 @@
 | --- | --- | --- |
 | `GET /v1/ip` | None | Observed public IPv4 address |
 | `POST /v1/enroll` | One-time invite in JSON `{"invite":"..."}` | Device credential, returned once |
+| `POST /v1/device` | Device credential; JSON `{"local_ip":"*.*.*.42"}` (or full IP / `null`) | Replaces or clears only this device's local IP metadata |
 | `POST /v1/token` | Device credential in `Authorization: Bearer ...` | Five-minute update token |
 | `POST /v1/update` | Update token in `Authorization: Bearer ...`; JSON `{}` | Reconciles the assigned record with the observed IPv4 |
+
+Enrollment optionally accepts `device_hostname` and `local_ip`. Updated clients send a masked local IP by default; full addresses require opting in. This metadata does not control DNS and is not added to the DNS audit log.
 
 Clients cannot select a different hostname or IP in an update request. Responses disable caching. The client requires HTTPS and refuses redirects.
 

@@ -21,6 +21,7 @@ class DeviceConfig(TypedDict):
     last_ip: NotRequired[str]
     last_sync: NotRequired[float]
     check_period_minutes: NotRequired[int]
+    ip_mode: NotRequired[str]
 
 
 class DNSRecord(TypedDict):

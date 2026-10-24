@@ -6,6 +6,11 @@ import pytest
 
 from dnspoke import cli
 
+@pytest.fixture(autouse=True)
+def local_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, 'local_address', lambda server: '192.168.1.42')
+
+
 def config(tmp_path: Path) -> Path:
     directory=tmp_path / 'private'
     directory.mkdir(mode=0o700)
@@ -36,17 +41,17 @@ def test_polling_skips_unchanged_ip_but_reconciles_daily(tmp_path: Path,monkeypa
     calls=[]
     def api(server: str,route: str,data: dict[str, object] | None=None,credential: str | None=None) -> dict[str, object]:
         calls.append(route)
-        responses: dict[str, dict[str, object]] = {'/v1/ip':{'ip':'8.8.8.8'},'/v1/token':{'token':'token','hostname':'alice.example.com'},'/v1/update':{'hostname':'alice.example.com','ip':'8.8.8.8','changed':True}}
+        responses: dict[str, dict[str, object]] = {'/v1/device': {'ok': True}, '/v1/ip':{'ip':'8.8.8.8'},'/v1/token':{'token':'token','hostname':'alice.example.com'},'/v1/update':{'hostname':'alice.example.com','ip':'8.8.8.8','changed':True}}
         return responses[route]
     monkeypatch.setattr(cli,'api',api)
     cli.update(path)
-    assert calls==['/v1/ip','/v1/token','/v1/update']
+    assert calls==['/v1/device','/v1/ip','/v1/token','/v1/update']
     calls.clear()
     cli.update(path)
-    assert calls==['/v1/ip']
+    assert calls==['/v1/device','/v1/ip']
     saved=cli.read_config(path);saved['last_sync']=0;cli.write_config(path,saved)
     calls.clear();cli.update(path)
-    assert calls==['/v1/ip','/v1/token','/v1/update']
+    assert calls==['/v1/device','/v1/ip','/v1/token','/v1/update']
 
 
 def test_no_config_commit_after_failed_update(tmp_path: Path,monkeypatch: pytest.MonkeyPatch) -> None:
@@ -117,7 +122,7 @@ def test_visible_or_positional_invite(tmp_path: Path,monkeypatch: pytest.MonkeyP
     monkeypatch.setattr('sys.argv',argv)
     def api(server: str,route: str,data: dict[str, object] | None=None,credential: str | None=None) -> dict[str, object]:
         assert server=='https://dns.example.com'
-        assert data=={'invite':'ab'*12, 'device_hostname': 'test-laptop.local'}
+        assert data=={'invite':'ab'*12, 'device_hostname': 'test-laptop.local', 'local_ip': '*.*.*.42'}
         return {'hostname':'alice.example.com','device_id':'test-device','device_secret':'y'*43}
     monkeypatch.setattr(cli,'api',api)
     assert cli.main()==0
@@ -148,3 +153,41 @@ def test_watch_uses_saved_period_even_after_errors(tmp_path: Path,monkeypatch: p
     monkeypatch.setattr('sys.argv',['dnspoke','--config',str(path),'watch'])
     assert cli.main()==0
     assert waits==[expected]
+
+
+@pytest.mark.parametrize(('address', 'masked'), [('192.168.1.42', '*.*.*.42'), ('fd00:1234::abcd', '*::abcd'), ('fd00::', '*::0')])
+def test_local_ip_masking_happens_before_transmission(monkeypatch: pytest.MonkeyPatch, address: str, masked: str) -> None:
+    monkeypatch.setattr(cli, 'local_address', lambda server: address)
+    assert cli.shared_local_ip('https://dns.example.com', 'masked') == masked
+    assert cli.shared_local_ip('https://dns.example.com', 'full') == address
+    def unavailable(server: str) -> str:
+        raise AssertionError('Hidden mode must not inspect the local network')
+    monkeypatch.setattr(cli, 'local_address', unavailable)
+    assert cli.shared_local_ip('https://dns.example.com', 'hidden') is None
+
+
+@pytest.mark.parametrize(('flag', 'mode', 'value'), [('--ip', 'full', '192.168.1.42'), ('--mask-ip', 'masked', '*.*.*.42'), ('--no-ip', 'hidden', None)])
+def test_configure_ip_privacy_syncs_immediately(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, flag: str, mode: str, value: str | None) -> None:
+    path = config(tmp_path)
+    calls: list[object] = []
+    def api(server: str, route: str, data: dict[str, object] | None = None, credential: str | None = None) -> dict[str, object]:
+        assert route == '/v1/device'
+        assert credential == 'x' * 43
+        calls.append(data)
+        return {'ok': True}
+    monkeypatch.setattr(cli, 'api', api)
+    monkeypatch.setattr('sys.argv', ['dnspoke', '--config', str(path), 'configure', flag])
+    assert cli.main() == 0
+    assert cli.read_config(path)['ip_mode'] == mode
+    assert calls == [{'local_ip': value}]
+
+
+def test_privacy_choice_survives_network_failure_for_retry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    path = config(tmp_path)
+    def offline(*args: object, **kwargs: object) -> dict[str, object]:
+        raise cli.ClientError('Cannot reach service')
+    monkeypatch.setattr(cli, 'api', offline)
+    monkeypatch.setattr('sys.argv', ['dnspoke', '--config', str(path), 'configure', '--no-ip'])
+    assert cli.main() == 1
+    assert cli.read_config(path)['ip_mode'] == 'hidden'
+    assert 'Cannot reach service' in capsys.readouterr().err

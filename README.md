@@ -87,6 +87,24 @@ dnspoke update
 dnspoke status
 ```
 
+### Local IP privacy
+
+The client reports its local hostname and a masked local address by default: `*.*.*.42` for IPv4 or `*::abcd` for IPv6. Masking happens on the client, so the full local address is not sent. This is the address used to reach the relay, which may belong to a VPN interface.
+
+For debugging, share the full local address during enrollment with `dnspoke enroll --ip INVITE`. Use `--no-ip` to omit it entirely.
+
+Change your choice later:
+
+```sh
+dnspoke configure --ip       # Share the full local IP
+dnspoke configure --mask-ip  # Restore the default masked address
+dnspoke configure --no-ip    # Remove the local IP from the server
+```
+
+These commands save `ip_mode` (`full`, `masked`, or `hidden`) in the client config and immediately replace or clear the server value. If the server is unreachable, the command reports failure and the next update retries the saved choice. Background updates read this setting on every check. Clearing removes the current value; it cannot remove copies in older server backups.
+
+The relay still needs your public IP for DNS updates. This setting only controls the additional local address, and does not change hostname reporting.
+
 ### Run in the background
 
 ```sh

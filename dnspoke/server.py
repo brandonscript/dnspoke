@@ -90,7 +90,15 @@ def create_app(store: Store | None = None, provider: DNSProvider | None = None) 
     def enroll() -> Response:
         store.throttle('enroll', request.remote_addr, 10, 900)
         data = body()
-        return jsonify(store.enroll(data.get('invite'), data.get('device_hostname')))
+        return jsonify(store.enroll(data.get('invite'), data.get('device_hostname'), data.get('local_ip')))
+
+    @app.post('/v1/device')
+    def device_details() -> Response:
+        data = body()
+        if set(data) != {'local_ip'}:
+            raise Rejected('Expected local_ip, or null to remove it')
+        store.set_local_ip(bearer(), data['local_ip'])
+        return jsonify(ok=True)
 
     @app.post('/v1/token')
     def token() -> Response:

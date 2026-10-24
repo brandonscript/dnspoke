@@ -113,8 +113,46 @@ def write_config(path: Path, config: Mapping[str, object]) -> None:
             os.unlink(temporary)
 
 
+def local_address(server: str) -> str:
+    parsed = urlsplit(server_url(server))
+    for family, kind, protocol, _, address in socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_DGRAM):
+        try:
+            with socket.socket(family, kind, protocol) as connection:
+                connection.connect(address)
+                return str(connection.getsockname()[0]).split('%', 1)[0]
+        except OSError:
+            continue
+    raise ClientError('Cannot determine the local address used to reach the relay')
+
+
+def shared_local_ip(server: str, mode: str) -> str | None:
+    if mode == 'hidden':
+        return None
+    if mode not in ('masked', 'full'):
+        raise ClientError('ip_mode must be masked, full, or hidden')
+    address = ipaddress.ip_address(local_address(server))
+    if mode == 'full':
+        return str(address)
+    if address.version == 4:
+        return '*.*.*.' + str(address).rsplit('.', 1)[1]
+    return '*::' + format(int(address) & 0xffff, 'x')
+
+
+def sync_local_ip(config: DeviceConfig) -> None:
+    api(config['server'], '/v1/device',
+        {'local_ip': shared_local_ip(config['server'], config.get('ip_mode', 'masked'))}, config['device_secret'])
+
+
+def ip_options(parser: argparse.ArgumentParser) -> None:
+    options = parser.add_mutually_exclusive_group()
+    options.add_argument('--ip', dest='ip_mode', action='store_const', const='full', help='Share the full local IP for debugging')
+    options.add_argument('--mask-ip', dest='ip_mode', action='store_const', const='masked', help='Share only the last IPv4 octet or IPv6 segment (default)')
+    options.add_argument('--no-ip', dest='ip_mode', action='store_const', const='hidden', help='Remove the local IP from the server')
+
+
 def update(path: Path, force: bool = False) -> None:
     config = read_config(path)
+    sync_local_ip(config)
     ip = response_string(api(config['server'], '/v1/ip'), 'ip')
     try:
         address = ipaddress.ip_address(ip)
@@ -162,10 +200,12 @@ def main() -> int:
     admin.configure_parser(commands.add_parser('admin', help='Manage this server using its local database and environment'))
     enroll = commands.add_parser('enroll', help='Exchange a one-time invite for this device')
     enroll.add_argument('invite', nargs='?', help='Complete invite code; prompts visibly when omitted')
+    ip_options(enroll)
     send = commands.add_parser('update', help='Report a changed public IPv4 address')
     send.add_argument('--force', action='store_true', help='Verify DNS even if your address is unchanged')
     configure = commands.add_parser('configure', help='Save background service settings')
-    configure.add_argument('--ttl', type=int, required=True, metavar='MINUTES', help='Minutes between checks (minimum 5)')
+    configure.add_argument('--ttl', type=int, metavar='MINUTES', help='Minutes between checks (minimum 5)')
+    ip_options(configure)
     commands.add_parser('status', help='Show local enrollment status without revealing credentials')
     commands.add_parser('token', help='Print a five-minute, single-use update token')
     watch = commands.add_parser('watch', help='Poll for address changes; suitable for brew services')
@@ -189,11 +229,14 @@ def main() -> int:
             except Rejected as error:
                 raise ClientError(str(error)) from None
             print(f'Enrolling with {server}…')
-            result = api(server, '/v1/enroll', {'invite': invite, 'device_hostname': socket.gethostname()})
+            mode = args.ip_mode or 'masked'
+            result = api(server, '/v1/enroll', {'invite': invite, 'device_hostname': socket.gethostname(),
+                                              'local_ip': shared_local_ip(server, mode)})
             if not all(isinstance(result.get(k), str) for k in ('device_id', 'device_secret', 'hostname')):
                 raise ClientError('Invalid enrollment response; ask the administrator for a new invite')
             enrollment: DeviceConfig = {
                 'server': server,
+                'ip_mode': mode,
                 'device_id': response_string(result, 'device_id'),
                 'device_secret': response_string(result, 'device_secret'),
                 'hostname': response_string(result, 'hostname'),
@@ -203,14 +246,25 @@ def main() -> int:
         elif args.command == 'update':
             update(args.config, args.force)
         elif args.command == 'configure':
-            check_period(args.ttl)
+            if args.ttl is None and args.ip_mode is None:
+                raise ClientError('Choose --ttl, --ip, --mask-ip, or --no-ip')
+            if args.ttl is not None:
+                check_period(args.ttl)
             config = read_config(args.config)
-            config['check_period_minutes'] = args.ttl
+            if args.ttl is not None:
+                config['check_period_minutes'] = args.ttl
+            if args.ip_mode is not None:
+                config['ip_mode'] = args.ip_mode
             write_config(args.config, config)
-            print(f'Polling TTL saved: {args.ttl} minutes. Restart any running service to apply.')
+            if args.ip_mode is not None:
+                sync_local_ip(config)
+                print(f'Local IP sharing: {args.ip_mode}. Server updated.')
+            if args.ttl is not None:
+                print(f'Polling TTL saved: {args.ttl} minutes. Restart any running service to apply.')
         elif args.command == 'status':
             config = read_config(args.config)
             status = {k: config.get(k) for k in ('server', 'hostname', 'device_id', 'last_ip', 'last_sync')}
+            status['ip_mode'] = config.get('ip_mode', 'masked')
             status['check_period_minutes'] = config.get('check_period_minutes', 5)
             print(json.dumps(status, indent=2))
         elif args.command == 'token':

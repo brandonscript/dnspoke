@@ -54,6 +54,23 @@ def public_ipv4(value: str | None) -> str:
     return str(address)
 
 
+def validate_local_ip(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise Rejected('Expected a masked local IP fragment')
+    if re.fullmatch(r'\*\.\*\.\*\.(?:0|[1-9][0-9]{0,2})', value) and int(value.rsplit('.', 1)[1]) <= 255:
+        return value
+    if re.fullmatch(r'\*::[0-9a-f]{1,4}', value):
+        return value
+    try:
+        if '%' in value:
+            raise ValueError
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        raise Rejected('Expected an IP address or masked fragment') from None
+
+
 class Store:
     def __init__(self, path: str | Path) -> None:
         self.path = str(path)
@@ -84,6 +101,8 @@ class Store:
         with self.transaction() as db:
             if 'device_hostname' not in {row['name'] for row in db.execute('PRAGMA table_info(devices)')}:
                 db.execute('ALTER TABLE devices ADD COLUMN device_hostname TEXT')
+            if 'local_ip' not in {row['name'] for row in db.execute('PRAGMA table_info(devices)')}:
+                db.execute('ALTER TABLE devices ADD COLUMN local_ip TEXT')
         Path(path).chmod(0o600)
 
     @contextmanager
@@ -122,7 +141,8 @@ class Store:
             db.execute('INSERT INTO invites VALUES (?,?,?,?)', (invite_digest(secret), name, time.time() + ttl, adopt))
         return secret
 
-    def enroll(self, invite: object, device_hostname: object = None) -> Enrollment:
+    def enroll(self, invite: object, device_hostname: object = None, local_ip: object = None) -> Enrollment:
+        fragment = validate_local_ip(local_ip)
         if device_hostname is not None and (
             not isinstance(device_hostname, str) or not 1 <= len(device_hostname) <= 253
             or not device_hostname.isprintable() or device_hostname != device_hostname.strip()
@@ -136,9 +156,17 @@ class Store:
                 raise Rejected('Invalid or expired invite', 401)
             if db.execute('SELECT 1 FROM devices WHERE hostname=? AND revoked=0', (row['hostname'],)).fetchone():
                 raise Rejected('Hostname already assigned', 409)
-            db.execute('INSERT INTO devices(id,hash,hostname,adopt,created,device_hostname) VALUES(?,?,?,?,?,?)', (device, digest(secret), row['hostname'], row['adopt'], now, device_hostname))
+            db.execute('INSERT INTO devices(id,hash,hostname,adopt,created,device_hostname,local_ip) VALUES(?,?,?,?,?,?,?)', (device, digest(secret), row['hostname'], row['adopt'], now, device_hostname, fragment))
             db.execute('DELETE FROM invites WHERE hash=?', (invite_digest(invite),))
         return {'device_id': device, 'device_secret': secret, 'hostname': row['hostname']}
+
+    def set_local_ip(self, secret: object, value: object) -> None:
+        fragment = validate_local_ip(value)
+        with self.transaction() as db:
+            changed = db.execute('UPDATE devices SET local_ip=? WHERE hash=? AND revoked=0',
+                                 (fragment, digest(secret))).rowcount
+            if not changed:
+                raise Rejected('Invalid or revoked device', 401)
 
     def token(self, secret: object) -> UpdateToken:
         token, now = new_secret(), time.time()

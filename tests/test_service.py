@@ -289,3 +289,28 @@ def test_invalid_device_hostname_does_not_consume_invite(setup: tuple[Store, Fak
     invite = store.invite('alice.example.com')
     assert send(client, '/v1/enroll', data={'invite': invite, 'device_hostname': value}).status_code == 400
     assert send(client, '/v1/enroll', data={'invite': invite, 'device_hostname': 'laptop.local'}).status_code == 200
+
+
+@pytest.mark.parametrize('fragment', ['*.*.*.42', '*.*.*.0', '*::abcd', '*::0', '192.168.1.42', 'fd00::abcd', None])
+def test_optional_local_ip_can_be_changed_and_removed(setup: tuple[Store, FakeProvider, FlaskClient], fragment: str | None) -> None:
+    store, _, client = setup
+    response = send(client, '/v1/enroll', data={'invite': store.invite('alice.example.com'), 'local_ip': fragment})
+    assert response.status_code == 200
+    secret = response.get_json()['device_secret']
+    with store.transaction() as db:
+        assert db.execute('SELECT local_ip FROM devices').fetchone()[0] == fragment
+    assert send(client, '/v1/device', secret, {'local_ip': '*::1234'}).status_code == 200
+    assert send(client, '/v1/device', secret, {'local_ip': None}).status_code == 200
+    with store.transaction() as db:
+        assert db.execute('SELECT local_ip FROM devices').fetchone()[0] is None
+    store.revoke(response.get_json()['device_id'])
+    assert send(client, '/v1/device', secret, {'local_ip': '*.*.*.42'}).status_code == 401
+
+
+@pytest.mark.parametrize('value', ['not-an-ip', 'fd00::abcd%en0', '*.*.*.256', '*::12345', '', 42, {'ip': '192.168.1.42'}])
+def test_invalid_local_ips_rejected(setup: tuple[Store, FakeProvider, FlaskClient], value: object) -> None:
+    store, _, client = setup
+    invite = store.invite('alice.example.com')
+    assert send(client, '/v1/enroll', data={'invite': invite, 'local_ip': value}).status_code == 400
+    device = store.enroll(invite)
+    assert send(client, '/v1/device', device['device_secret'], {'local_ip': value}).status_code == 400
