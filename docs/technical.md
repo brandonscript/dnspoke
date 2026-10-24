@@ -39,4 +39,4 @@ Record matching is exact. No records are deleted. Other names, wildcards, and co
 
 A provider write cannot participate in the local database transaction. If a remote write succeeds but acknowledgement or verification is lost, inspect the exact record before retrying; a newly created record may need explicit adoption. Other applications sharing the provider account may also compete for provider-side limits.
 
-Provider-selection tests use mocked Lexicon clients. Verify your chosen provider with a controlled record before using it for existing hostnames.
+Provider-selection tests use mocked [Lexicon](https://dns-lexicon.github.io/dns-lexicon/) clients. Verify your chosen provider with a controlled record before using it for existing hostnames.

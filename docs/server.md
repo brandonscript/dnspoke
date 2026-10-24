@@ -1,6 +1,6 @@
 # Server configuration
 
-The relay uses DNS Lexicon to manage records. Select your provider and keep its credentials on the server. Clients receive permission to update one hostname, not access to the provider account.
+The relay uses [DNS Lexicon](https://dns-lexicon.github.io/dns-lexicon/) to manage records. Select your provider and keep its credentials on the server. Clients receive permission to update one hostname, not access to the provider account.
 
 ## Installing without Docker
 
@@ -29,14 +29,14 @@ Copy `.env.example` to `.env` and restrict it with `chmod 600 .env`.
 | --- | --- | --- |
 | `RELAY_PUBLIC_URL` | Public HTTPS origin clients use for enrollment and updates | Generated and saved on first startup |
 | `DNS_ZONE` | DNS zone managed by this instance | Required |
-| `DNS_PROVIDER` | Lexicon provider identifier | Required |
+| `DNS_PROVIDER` | [Lexicon](https://dns-lexicon.github.io/dns-lexicon/) provider identifier | Required |
 | `DNS_PROVIDER_COOLDOWN` | Minimum seconds between provider operations, including failed attempts | `0` |
 | `DNS_DATABASE` | SQLite database path | `/data/state.sqlite3` |
 | `DNS_TRUST_PROXY` | Set to `1` behind the trusted HTTPS proxy | Off |
 | `DNS_TRUSTED_PROXY` | Fixed source IP of that proxy | Required when proxy trust is enabled |
 | `PROXY_NETWORK` | Existing Docker network shared with the HTTPS proxy | Set in `.env` |
 
-Add the exact `LEXICON_<PROVIDER>_*` credential variables required by your provider. See [Lexicon's configuration reference](https://dns-lexicon.github.io/dns-lexicon/configuration_reference.html). Providers that require extra SDK dependencies may also need their Lexicon extras installed in the server image.
+Add the exact `LEXICON_<PROVIDER>_*` credential variables required by your provider. See [Lexicon's configuration reference](https://dns-lexicon.github.io/dns-lexicon/configuration_reference.html). Providers that require extra SDK dependencies may also need their [Lexicon](https://dns-lexicon.github.io/dns-lexicon/) extras installed in the server image.
 
 `RELAY_PUBLIC_URL` must be an HTTPS origin, without a path, query string, or embedded credentials. Recreate the container after changing environment settings:
 
@@ -71,7 +71,7 @@ The proxy must replace untrusted forwarded headers. Configure a public DNS recor
 
 ### Nginx and Let's Encrypt
 
-Nginx can terminate HTTPS and forward requests to dnspoke. Point your relay hostname (for example, `dns.example.com`) at the proxy's public address and allow inbound TCP ports 80 and 443. Any published AAAA record must also reach this proxy.
+Nginx can terminate HTTPS and forward requests to `dnspoke`. Point your relay hostname (for example, `dns.example.com`) at the proxy's public address and allow inbound TCP ports 80 and 443. Any published AAAA record must also reach this proxy.
 
 For Nginx running on the host, publish the relay port only on loopback by adding this to the `dnspoke` service in your Compose file:
 

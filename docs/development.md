@@ -1,6 +1,6 @@
 # Development
 
-Python 3.12 or later is required. The client uses only the standard library; the server installs Flask, Gunicorn, and DNS Lexicon.
+Python 3.12 or later is required. The client uses only the standard library; the server installs Flask, Gunicorn, and [DNS Lexicon](https://dns-lexicon.github.io/dns-lexicon/).
 
 ```sh
 python3 -m venv .venv

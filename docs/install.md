@@ -1,4 +1,4 @@
-# Installing dnspoke
+# Installing `dnspoke`
 
 The client runs on macOS, Linux, and Windows. The server runs on macOS and Linux, either natively or in Docker. Python 3.12 or later is required by the script installers; Homebrew installs Python for you.
 

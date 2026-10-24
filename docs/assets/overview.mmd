@@ -1,0 +1,17 @@
+%% Render with Mermaid CLI and --backgroundColor "#101214".
+%%{init: {"theme":"base","fontFamily":"monospace","themeVariables":{"fontFamily":"monospace","primaryColor":"#172019","primaryTextColor":"#d7ddd6","primaryBorderColor":"#73836e","lineColor":"#98a58f","textColor":"#d7ddd6","actorBkg":"#172019","actorBorder":"#73836e","actorTextColor":"#d7ddd6","actorLineColor":"#586151","signalColor":"#bdcbb2","signalTextColor":"#d7ddd6","labelBoxBkgColor":"#172019","labelBoxBorderColor":"#73836e","labelTextColor":"#b6ce9e","loopTextColor":"#b6ce9e","noteBkgColor":"#172019","noteTextColor":"#a8b3a3","noteBorderColor":"#424b3e","fontSize":"14px"},"sequence":{"useMaxWidth":true,"mirrorActors":false,"actorMargin":65,"width":145,"height":40,"boxMargin":8,"boxTextMargin":6,"noteMargin":10,"messageMargin":24,"diagramMarginX":16,"diagramMarginY":16,"wrap":false,"actorFontSize":14,"messageFontSize":14,"noteFontSize":13},"look":"classic","themeCSS":".actor, .note, .labelBox { filter: none !important; }"}}%%
+sequenceDiagram
+    participant device as Their device
+    participant relay as Your relay
+    participant dns as DNS provider
+
+    Note over device,relay: Invite for alice.example.com
+    device->>relay: Redeem invite
+    relay-->>device: Exchanged for<br/>secure device key
+
+    loop When Alice's IP changes
+        device->>relay: Notify dnspoke server
+        relay->>dns: Update DNS record
+        dns-->>relay: Record saved
+        relay-->>device: Update confirmed
+    end

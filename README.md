@@ -1,6 +1,14 @@
-# dnspoke
+# `dnspoke`
 
-dnspoke is a self-hosted dynamic DNS relay. Invite someone to manage one hostname, and their client keeps it pointed at their current public IP. DNS-provider credentials stay on your server.
+Say you give a friend or teammate `alice.example.com` for their home server or development machine. Every time their public IP changes, they need you to update DNS—or you need to give them access to your DNS account.
+
+`dnspoke` lets them handle those changes themselves. Run the relay, send them a one-time invite scoped to their hostname, and their client keeps that hostname pointed at their current public IP. They can manage their own address without touching anyone else's records, and your DNS-provider credentials stay on your server.
+
+`dnspoke` is self-hosted, works with [DNS Lexicon](https://dns-lexicon.github.io/dns-lexicon/) providers, and supports background updates on macOS, Linux, and Windows.
+
+![Alice exchanges an invite for a secure device key, then notifies the relay when her IP changes. The relay updates DNS and confirms the result.](docs/assets/overview.svg)
+
+The client checks periodically and starts each connection to the relay. The relay updates the assigned DNS record and sends the result back to the client.
 
 ## For DNS owners
 
