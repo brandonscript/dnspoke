@@ -24,6 +24,7 @@ from . import __version__, admin
 from .core import Rejected
 from .invitations import unpack_invite
 from .types import DeviceConfig
+from .help import add_command, add_help_command, format_help, parse_arguments
 from .storage import ClientError as ClientError, check_path, config_path, prepare_directory, secure_file
 
 
@@ -188,26 +189,62 @@ def polling_interval(config: Mapping[str, object], minutes: int | None = None, s
 
 def main() -> int:
     default = config_path()
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', action='version', version=__version__)
-    parser.add_argument('--config', type=Path, default=default)
-    commands = parser.add_subparsers(dest='command', required=True)
-    admin.configure_parser(commands.add_parser('admin', help='Manage this server using its local database and environment'))
-    enroll = commands.add_parser('enroll', help='Exchange a one-time invite for this device')
-    enroll.add_argument('invite', nargs='?', help='Complete invite code; prompts visibly when omitted')
+    parser = argparse.ArgumentParser(prog='dnspoke')
+    format_help(parser, 'Keep your assigned DNS hostname pointed at your current public IP.\n'
+                'Enroll with an invite from a relay owner, update once, then enable background checks.',
+                '  dnspoke enroll INVITE\n'
+                '  dnspoke update\n'
+                '  dnspoke watch --ttl 15\n'
+                '  dnspoke help admin\n'
+                '  docker exec dnspoke dnspoke admin devices')
+    parser.add_argument('--version', action='version', version=__version__, help='Show the installed version and exit')
+    parser.add_argument('--config', type=Path, default=default, metavar='FILE',
+                        help=f'Client credential file (default: {default}); separate from the server database')
+    commands = parser.add_subparsers(dest='command', title='Commands', metavar='COMMAND')
+    admin.configure_parser(add_command(commands, 'admin', 'Administer a relay using its local database'))
+    enroll = add_command(commands, 'enroll', 'Enroll this device with a one-time invite',
+                         'Exchange an invite for a persistent device credential. The invite includes the relay URL.\n'
+                         'Omit INVITE to paste it at a visible prompt. Each invite can be used once.',
+                         '  dnspoke enroll\n'
+                         '  dnspoke enroll INVITE\n'
+                         '  dnspoke enroll --no-ip INVITE')
+    enroll.add_argument('invite', nargs='?', metavar='INVITE', help='Complete invite code supplied by the relay owner')
     ip_options(enroll)
-    send = commands.add_parser('update', help='Report a changed public IPv4 address')
-    send.add_argument('--force', action='store_true', help='Verify DNS even if your address is unchanged')
-    configure = commands.add_parser('configure', help='Save background service settings')
-    configure.add_argument('--ttl', type=int, metavar='MINUTES', help='Minutes between checks (minimum 5)')
+    send = add_command(commands, 'update', 'Update DNS if your public IPv4 address changed',
+                       'Contact the relay, check your public IP, and update only your assigned hostname.\n'
+                       'Unchanged addresses are skipped unless forced or due for daily reconciliation.',
+                       '  dnspoke update\n  dnspoke update --force')
+    send.add_argument('--force', action='store_true', help='Verify DNS even if your address is unchanged; rate limits still apply')
+    configure = add_command(commands, 'configure', 'Save polling and local IP sharing preferences',
+                            'Save settings for this enrolled device. Local IP sharing changes sync immediately;\n'
+                            'restart a running watcher after changing its polling period. TTL is in minutes here.',
+                            '  dnspoke configure --ttl 15\n'
+                            '  dnspoke configure --ip\n'
+                            '  dnspoke configure --mask-ip\n'
+                            '  dnspoke configure --no-ip')
+    configure.add_argument('--ttl', type=int, metavar='MINUTES', help='Minutes between checks (minimum: 5; default: 5)')
     ip_options(configure)
-    commands.add_parser('status', help='Show local enrollment status without revealing credentials')
-    commands.add_parser('token', help='Print a five-minute, single-use update token')
-    watch = commands.add_parser('watch', help='Poll for address changes; suitable for brew services')
+    add_command(commands, 'status', 'Show enrollment and saved settings without credentials',
+                'Show the relay URL, assigned hostname, device ID, last sync, polling period, and IP sharing mode.\n'
+                'This reads local settings; it does not query the relay.', '  dnspoke status')
+    add_command(commands, 'token', 'Print a short-lived DNS update token',
+                'Mint and print a single-use update token, valid for five minutes. Requires enrollment.\n'
+                'This prints a secret; update and watch obtain tokens automatically for normal use.', '  dnspoke token')
+    watch = add_command(commands, 'watch', 'Keep DNS current with background polling',
+                        'Check periodically until stopped with Ctrl+C or a termination signal.\n'
+                        'Use the saved polling period (default: five minutes), or override it with --ttl.\n'
+                        'For Homebrew services, configure the period first, then restart the service.',
+                        '  dnspoke watch\n'
+                        '  dnspoke watch --ttl 15\n'
+                        '  dnspoke configure --ttl 15\n'
+                        '  brew services restart dnspoke')
     period = watch.add_mutually_exclusive_group()
-    period.add_argument('--ttl', type=int, metavar='MINUTES', help='Override saved check period in minutes (minimum 5)')
-    period.add_argument('--interval', type=int, metavar='SECONDS', help='Legacy override in seconds (minimum 300)')
-    args = parser.parse_args()
+    period.add_argument('--ttl', type=int, metavar='MINUTES', help='Override the saved check period (minimum: 5 minutes)')
+    period.add_argument('--interval', type=int, metavar='SECONDS', help='Legacy seconds-based override (minimum: 300)')
+    add_help_command(commands)
+    args = parse_arguments(parser)
+    if args is None:
+        return 0
     if args.command == 'admin':
         return admin.run(args)
     try:

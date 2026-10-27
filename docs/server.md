@@ -10,7 +10,7 @@ Install the server dependencies with Python 3.12 or later:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.6'
+.venv/bin/python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.7'
 ```
 
 Set `DNS_DATABASE` to a writable file, for example `$HOME/.local/share/dnspoke/server/state.sqlite3`, and `TLDEXTRACT_CACHE_PATH` to a writable cache directory. The Docker default `/data/state.sqlite3` is intended for a mounted volume. After configuring the environment, start the native server with:
@@ -43,6 +43,25 @@ Add the exact `LEXICON_<PROVIDER>_*` credential variables required by your provi
 ```sh
 docker compose -f compose.example.yml up -d --force-recreate
 ```
+
+## Local administration
+
+Admin commands use the relay's local SQLite database and server environment. A Homebrew client installation on the Docker host does not automatically connect to the container's database. For Docker, run the command inside the running relay:
+
+```sh
+docker exec dnspoke dnspoke admin devices
+docker exec dnspoke dnspoke help admin invite
+```
+
+For a native relay, use the same `DNS_DATABASE` environment setting as the server, or specify its database directly:
+
+```sh
+dnspoke admin --database /path/to/state.sqlite3 devices
+```
+
+`--database` also works after the subcommand. `--config` selects the client credential file and does not configure the server database. Invites and endpoint configuration require `DNS_ZONE` and the same server environment as the running relay. Device listing, revocation, and audit commands report a missing database instead of creating an empty one.
+
+Use `dnspoke help admin` or `dnspoke admin help` to browse administration commands. `dnspoke admin device`, `dnspoke admin devices`, and `dnspoke admin devices list` all list devices.
 
 ## Choosing the relay address
 

@@ -134,6 +134,8 @@ Run Homebrew services as your user, without `sudo`. Stop with `brew services sto
 
 For client commands, `--ttl` is the polling interval in minutes, with a minimum of five. For `dnspoke admin invite`, it is the invite lifetime in seconds.
 
+Run `dnspoke help` for an overview, or `dnspoke help admin invite` for a specific command. Every command includes examples and options; bare command groups such as `dnspoke admin` also show help.
+
 ## Details
 
 - Only public IPv4 A records are supported. The address is the one the relay sees, so VPNs and outbound proxies affect it.
