@@ -149,3 +149,10 @@ Run `dnspoke help` for an overview, or `dnspoke help admin invite` for a specifi
 ## License
 
 [MIT](LICENSE).
+
+## Local TXT, CNAME and ACME administration
+
+Local administrators can manage exact-name TXT/CNAME records and journaled DNS-01
+challenges using server credentials. Enrolled clients remain limited to their
+assigned A records. See [local DNS administration](docs/dns-admin.md) for allowlists,
+examples, safe cleanup and limitations.

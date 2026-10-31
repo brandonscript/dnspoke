@@ -19,6 +19,7 @@ Issues = "https://github.com/brandonscript/dnspoke/issues"
 server = ["Flask>=3.1,<4", "gunicorn>=23,<24", "dns-lexicon>=3.17,<4"]
 test = ["pytest>=8,<10", "Flask>=3.1,<4", "cryptography>=44"]
 typecheck = ["mypy>=1.15,<2", "types-requests"]
+lint = ["ruff==0.17.3", "pre-commit>=4,<5"]
 
 [project.scripts]
 dnspoke = "dnspoke.cli:main"
@@ -34,3 +35,10 @@ python_version = "3.12"
 files = ["dnspoke", "tests"]
 strict = true
 show_error_codes = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "E501", "F", "I"]
