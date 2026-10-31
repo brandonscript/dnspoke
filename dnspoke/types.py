@@ -1,5 +1,7 @@
 """Typed data exchanged between the store, clients, and DNS adapters."""
+
 from typing import NotRequired, Protocol, TypedDict
+
 
 class Enrollment(TypedDict):
     device_id: str

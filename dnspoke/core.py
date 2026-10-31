@@ -1,15 +1,17 @@
 """Shared validation and persistent credentials. No DNS-provider credentials here."""
-from collections.abc import Iterator
-from contextlib import contextmanager
-from pathlib import Path
+
 import hashlib
 import ipaddress
 import re
 import secrets
 import sqlite3
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
 from .types import Enrollment, UpdateToken
+
 
 class Rejected(Exception):
     def __init__(self, message: str, status: int = 400) -> None:
@@ -19,14 +21,14 @@ class Rejected(Exception):
 
 def digest(secret: object) -> str:
     if not isinstance(secret, str) or not 32 <= len(secret) <= 200:
-        raise Rejected('Invalid credential', 401)
+        raise Rejected("Invalid credential", 401)
     return hashlib.sha256(secret.encode()).hexdigest()
 
 
 def invite_digest(secret: object) -> str:
-    if isinstance(secret, str) and re.fullmatch(r'[0-9a-f]{24}', secret):
+    if isinstance(secret, str) and re.fullmatch(r"[0-9a-f]{24}", secret):
         return hashlib.sha256(secret.encode()).hexdigest()
-    raise Rejected('Invalid invitation', 401)
+    raise Rejected("Invalid invitation", 401)
 
 
 def new_secret() -> str:
@@ -34,12 +36,12 @@ def new_secret() -> str:
 
 
 def hostname(label: str, zone: str) -> str:
-    zone = zone.lower().rstrip('.')
-    if not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label):
-        raise Rejected('Use a single lowercase DNS label (no dots or wildcards)')
-    if label in {'www', 'mail', 'dns', 'api', 'auth', 'console', 'ns1', 'ns2', 'smtp'}:
-        raise Rejected('This label is reserved for infrastructure')
-    return f'{label}.{zone}'
+    zone = zone.lower().rstrip(".")
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label):
+        raise Rejected("Use a single lowercase DNS label (no dots or wildcards)")
+    if label in {"www", "mail", "dns", "api", "auth", "console", "ns1", "ns2", "smtp"}:
+        raise Rejected("This label is reserved for infrastructure")
+    return f"{label}.{zone}"
 
 
 def public_ipv4(value: str | None) -> str:
@@ -48,9 +50,9 @@ def public_ipv4(value: str | None) -> str:
             raise ValueError
         address = ipaddress.ip_address(value)
     except ValueError:
-        raise Rejected('A public IPv4 address is required') from None
+        raise Rejected("A public IPv4 address is required") from None
     if address.version != 4 or not address.is_global:
-        raise Rejected('A public IPv4 address is required')
+        raise Rejected("A public IPv4 address is required")
     return str(address)
 
 
@@ -58,17 +60,20 @@ def validate_local_ip(value: object) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise Rejected('Expected a masked local IP fragment')
-    if re.fullmatch(r'\*\.\*\.\*\.(?:0|[1-9][0-9]{0,2})', value) and int(value.rsplit('.', 1)[1]) <= 255:
+        raise Rejected("Expected a masked local IP fragment")
+    if (
+        re.fullmatch(r"\*\.\*\.\*\.(?:0|[1-9][0-9]{0,2})", value)
+        and int(value.rsplit(".", 1)[1]) <= 255
+    ):
         return value
-    if re.fullmatch(r'\*::[0-9a-f]{1,4}', value):
+    if re.fullmatch(r"\*::[0-9a-f]{1,4}", value):
         return value
     try:
-        if '%' in value:
+        if "%" in value:
             raise ValueError
         return str(ipaddress.ip_address(value))
     except ValueError:
-        raise Rejected('Expected an IP address or masked fragment') from None
+        raise Rejected("Expected an IP address or masked fragment") from None
 
 
 class Store:
@@ -76,7 +81,7 @@ class Store:
         self.path = str(path)
         Path(path).parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         with self.transaction() as db:
-            db.executescript('''
+            db.executescript("""
                 CREATE TABLE IF NOT EXISTS invites (
                     hash TEXT PRIMARY KEY, hostname TEXT NOT NULL,
                     expires REAL NOT NULL, adopt INTEGER NOT NULL);
@@ -97,12 +102,14 @@ class Store:
                 CREATE TABLE IF NOT EXISTS audit (
                     at REAL NOT NULL, device TEXT NOT NULL, hostname TEXT NOT NULL,
                     old_ip TEXT, new_ip TEXT NOT NULL, changed INTEGER NOT NULL);
-            ''')
+            """)
         with self.transaction() as db:
-            if 'device_hostname' not in {row['name'] for row in db.execute('PRAGMA table_info(devices)')}:
-                db.execute('ALTER TABLE devices ADD COLUMN device_hostname TEXT')
-            if 'local_ip' not in {row['name'] for row in db.execute('PRAGMA table_info(devices)')}:
-                db.execute('ALTER TABLE devices ADD COLUMN local_ip TEXT')
+            if "device_hostname" not in {
+                row["name"] for row in db.execute("PRAGMA table_info(devices)")
+            }:
+                db.execute("ALTER TABLE devices ADD COLUMN device_hostname TEXT")
+            if "local_ip" not in {row["name"] for row in db.execute("PRAGMA table_info(devices)")}:
+                db.execute("ALTER TABLE devices ADD COLUMN local_ip TEXT")
         Path(path).chmod(0o600)
 
     @contextmanager
@@ -110,7 +117,7 @@ class Store:
         db = sqlite3.connect(self.path, timeout=5)
         db.row_factory = sqlite3.Row
         try:
-            db.execute('BEGIN IMMEDIATE')
+            db.execute("BEGIN IMMEDIATE")
             yield db
             db.commit()
         except BaseException:
@@ -122,66 +129,100 @@ class Store:
     def throttle(self, category: str, identity: str | None, maximum: int, period: int) -> None:
         # Separate transaction: invalid auth attempts must still count.
         now = time.time()
-        key = hashlib.sha256(f'{category}:{identity}:{int(now // period)}'.encode()).hexdigest()
+        key = hashlib.sha256(f"{category}:{identity}:{int(now // period)}".encode()).hexdigest()
         with self.transaction() as db:
-            db.execute('DELETE FROM limits WHERE expires < ?', (now,))
-            row = db.execute('SELECT count FROM limits WHERE bucket=?', (key,)).fetchone()
-            if row and row['count'] >= maximum:
-                raise Rejected('Too many requests; try again later', 429)
-            db.execute('INSERT INTO limits VALUES (?,1,?) ON CONFLICT(bucket) DO UPDATE SET count=count+1', (key, now + period))
+            db.execute("DELETE FROM limits WHERE expires < ?", (now,))
+            row = db.execute("SELECT count FROM limits WHERE bucket=?", (key,)).fetchone()
+            if row and row["count"] >= maximum:
+                raise Rejected("Too many requests; try again later", 429)
+            db.execute(
+                "INSERT INTO limits VALUES (?,1,?) ON CONFLICT(bucket) DO UPDATE SET count=count+1",
+                (key, now + period),
+            )
 
     def invite(self, name: str, ttl: int = 900, adopt: bool = False, *, yolo: bool = False) -> str:
         if not 60 <= ttl <= 86400:
-            raise Rejected('Invite lifetime must be between 60 and 86400 seconds (24 hours)')
+            raise Rejected("Invite lifetime must be between 60 and 86400 seconds (24 hours)")
         if ttl > 900 and not yolo:
-            raise Rejected('Invites longer than 15 minutes require --yolo')
+            raise Rejected("Invites longer than 15 minutes require --yolo")
         secret = secrets.token_hex(12)  # 96-bit, single-use invitation only.
         with self.transaction() as db:
-            if db.execute('SELECT 1 FROM devices WHERE hostname=? AND revoked=0', (name,)).fetchone():
-                raise Rejected('Revoke the active device for this hostname first', 409)
-            db.execute('DELETE FROM invites WHERE hostname=? OR expires < ?', (name, time.time()))
-            db.execute('INSERT INTO invites VALUES (?,?,?,?)', (invite_digest(secret), name, time.time() + ttl, adopt))
+            if db.execute(
+                "SELECT 1 FROM devices WHERE hostname=? AND revoked=0", (name,)
+            ).fetchone():
+                raise Rejected("Revoke the active device for this hostname first", 409)
+            db.execute("DELETE FROM invites WHERE hostname=? OR expires < ?", (name, time.time()))
+            db.execute(
+                "INSERT INTO invites VALUES (?,?,?,?)",
+                (invite_digest(secret), name, time.time() + ttl, adopt),
+            )
         return secret
 
-    def enroll(self, invite: object, device_hostname: object = None, local_ip: object = None) -> Enrollment:
+    def enroll(
+        self, invite: object, device_hostname: object = None, local_ip: object = None
+    ) -> Enrollment:
         fragment = validate_local_ip(local_ip)
         if device_hostname is not None and (
-            not isinstance(device_hostname, str) or not 1 <= len(device_hostname) <= 253
-            or not device_hostname.isprintable() or device_hostname != device_hostname.strip()
+            not isinstance(device_hostname, str)
+            or not 1 <= len(device_hostname) <= 253
+            or not device_hostname.isprintable()
+            or device_hostname != device_hostname.strip()
         ):
-            raise Rejected('Device hostname must be 1–253 printable characters without surrounding whitespace')
+            raise Rejected(
+                "Device hostname must be 1–253 printable characters without surrounding whitespace"
+            )
         secret, device = new_secret(), secrets.token_hex(12)
         now = time.time()
         with self.transaction() as db:
-            row = db.execute('SELECT * FROM invites WHERE hash=? AND expires>?', (invite_digest(invite), now)).fetchone()
+            row = db.execute(
+                "SELECT * FROM invites WHERE hash=? AND expires>?", (invite_digest(invite), now)
+            ).fetchone()
             if not row:
-                raise Rejected('Invalid or expired invite', 401)
-            if db.execute('SELECT 1 FROM devices WHERE hostname=? AND revoked=0', (row['hostname'],)).fetchone():
-                raise Rejected('Hostname already assigned', 409)
-            db.execute('INSERT INTO devices(id,hash,hostname,adopt,created,device_hostname,local_ip) VALUES(?,?,?,?,?,?,?)', (device, digest(secret), row['hostname'], row['adopt'], now, device_hostname, fragment))
-            db.execute('DELETE FROM invites WHERE hash=?', (invite_digest(invite),))
-        return {'device_id': device, 'device_secret': secret, 'hostname': row['hostname']}
+                raise Rejected("Invalid or expired invite", 401)
+            if db.execute(
+                "SELECT 1 FROM devices WHERE hostname=? AND revoked=0", (row["hostname"],)
+            ).fetchone():
+                raise Rejected("Hostname already assigned", 409)
+            db.execute(
+                "INSERT INTO devices(id,hash,hostname,adopt,created,device_hostname,local_ip) "
+                "VALUES(?,?,?,?,?,?,?)",
+                (
+                    device,
+                    digest(secret),
+                    row["hostname"],
+                    row["adopt"],
+                    now,
+                    device_hostname,
+                    fragment,
+                ),
+            )
+            db.execute("DELETE FROM invites WHERE hash=?", (invite_digest(invite),))
+        return {"device_id": device, "device_secret": secret, "hostname": row["hostname"]}
 
     def set_local_ip(self, secret: object, value: object) -> None:
         fragment = validate_local_ip(value)
         with self.transaction() as db:
-            changed = db.execute('UPDATE devices SET local_ip=? WHERE hash=? AND revoked=0',
-                                 (fragment, digest(secret))).rowcount
+            changed = db.execute(
+                "UPDATE devices SET local_ip=? WHERE hash=? AND revoked=0",
+                (fragment, digest(secret)),
+            ).rowcount
             if not changed:
-                raise Rejected('Invalid or revoked device', 401)
+                raise Rejected("Invalid or revoked device", 401)
 
     def token(self, secret: object) -> UpdateToken:
         token, now = new_secret(), time.time()
         with self.transaction() as db:
-            row = db.execute('SELECT * FROM devices WHERE hash=? AND revoked=0', (digest(secret),)).fetchone()
+            row = db.execute(
+                "SELECT * FROM devices WHERE hash=? AND revoked=0", (digest(secret),)
+            ).fetchone()
             if not row:
-                raise Rejected('Invalid or revoked device', 401)
-            db.execute('DELETE FROM tokens WHERE expires <= ? OR device=?', (now, row['id']))
-            db.execute('INSERT INTO tokens VALUES (?,?,?)', (digest(token), row['id'], now + 300))
-        return {'token': token, 'expires_in': 300, 'hostname': row['hostname']}
+                raise Rejected("Invalid or revoked device", 401)
+            db.execute("DELETE FROM tokens WHERE expires <= ? OR device=?", (now, row["id"]))
+            db.execute("INSERT INTO tokens VALUES (?,?,?)", (digest(token), row["id"], now + 300))
+        return {"token": token, "expires_in": 300, "hostname": row["hostname"]}
 
     def revoke(self, device: str) -> bool:
         with self.transaction() as db:
-            found = db.execute('UPDATE devices SET revoked=1 WHERE id=?', (device,)).rowcount
-            db.execute('DELETE FROM tokens WHERE device=?', (device,))
+            found = db.execute("UPDATE devices SET revoked=1 WHERE id=?", (device,)).rowcount
+            db.execute("DELETE FROM tokens WHERE device=?", (device,))
             return bool(found)
