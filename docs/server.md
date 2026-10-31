@@ -10,7 +10,7 @@ Install the server dependencies with Python 3.12 or later:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.7'
+.venv/bin/python -m pip install 'dnspoke[server] @ git+https://github.com/brandonscript/dnspoke.git@v0.1.8'
 ```
 
 Set `DNS_DATABASE` to a writable file, for example `$HOME/.local/share/dnspoke/server/state.sqlite3`, and `TLDEXTRACT_CACHE_PATH` to a writable cache directory. The Docker default `/data/state.sqlite3` is intended for a mounted volume. After configuring the environment, start the native server with:

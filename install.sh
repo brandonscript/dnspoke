@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-version=v0.1.7
+version=v0.1.8
 prefix="${HOME}/.local"
 source_path=
 server=false
@@ -38,7 +38,7 @@ if [ -z "$python_command" ] || ! "$python_command" -c 'import ssl, venv, sys; sy
     echo 'Install Python 3.12+ with SSL and venv support, then rerun. On Debian/Ubuntu install the matching python3-venv package too.' >&2
     exit 1
 fi
-"$python_command" -c 'import re,sys; sys.exit(not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+",sys.argv[1]))' "$version" || { echo 'Version must look like v0.1.7.' >&2; exit 1; }
+"$python_command" -c 'import re,sys; sys.exit(not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+",sys.argv[1]))' "$version" || { echo 'Version must look like v0.1.8.' >&2; exit 1; }
 mkdir -p "$prefix"
 prefix=$(cd "$prefix" && pwd)
 venv_path="$prefix/share/dnspoke/venv"
