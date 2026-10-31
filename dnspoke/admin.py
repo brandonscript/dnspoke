@@ -8,6 +8,7 @@ import sqlite3
 import sys
 
 from .core import Store, Rejected, hostname
+from . import admin_dns
 from .help import add_command, add_help_command, format_help, parse_arguments
 from .invitations import pack_invite
 from .settings import relay_url
@@ -63,6 +64,7 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     for child in (endpoint, invite, devices, revoke, audit):
         child.add_argument('--database', type=Path, metavar='PATH', default=argparse.SUPPRESS,
                            help='Server SQLite database (overrides DNS_DATABASE)')
+    admin_dns.configure_parser(commands)
     add_help_command(commands)
 
 
@@ -75,6 +77,8 @@ def database_path(args: argparse.Namespace) -> Path:
 
 
 def run(args: argparse.Namespace) -> int:
+    if args.admin_command in ("dns", "acme"):
+        return admin_dns.run(args)
     path: Path | None = None
     try:
         if args.admin_command in ('invite', 'endpoint') and not os.environ.get('DNS_ZONE'):
