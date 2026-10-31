@@ -12,3 +12,4 @@ dist/
 !.env.example
 *.log
 .DS_Store
+.ruff_cache/

@@ -4,7 +4,9 @@ Python 3.12 or later is required. The client uses only the standard library; the
 
 ```sh
 python3 -m venv .venv
-.venv/bin/pip install -e '.[server,test,typecheck]'
+.venv/bin/pip install -e '.[server,test,typecheck,lint]'
+.venv/bin/pre-commit install
+.venv/bin/pre-commit run --all-files
 .venv/bin/mypy
 .venv/bin/pytest -q
 ```
@@ -33,3 +35,8 @@ py -3 -m venv .venv
 ```
 
 Both installers accept a local source checkout for testing: `sh install.sh --source . --prefix /tmp/dnspoke-test`, or `.\install.ps1 -Source . -InstallDir "$env:TEMP\dnspoke-test" -NoPath`. CI exercises installation and reinstallation, including paths containing spaces. Neither installer enrolls a client or starts background updates automatically.
+
+Ruff checks basic errors, imports, and a 100-character line limit. The pre-commit hooks
+apply safe lint fixes and formatting to staged Python files; restage changes and retry
+when a hook edits a file. CI checks formatting without changing files. During the
+DNS administration rollout, these checks cover its three Python files only.
