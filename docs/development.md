@@ -39,4 +39,3 @@ Both installers accept a local source checkout for testing: `sh install.sh --sou
 Ruff checks basic errors, imports, and a 100-character line limit. The pre-commit hooks
 apply safe lint fixes and formatting to staged Python files; restage changes and retry
 when a hook edits a file. CI checks formatting without changing files.
-
