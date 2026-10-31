@@ -12,8 +12,8 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install '.[lint]'
       - run: pre-commit validate-config
-      - run: ruff check dnspoke/admin.py dnspoke/admin_dns.py tests/test_admin_dns.py
-      - run: ruff format --check dnspoke/admin.py dnspoke/admin_dns.py tests/test_admin_dns.py
+      - run: ruff check .
+      - run: ruff format --check .
   server:
     strategy:
       matrix:

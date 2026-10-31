@@ -1,16 +1,17 @@
 """Platform-specific locations and access checks for device credentials."""
-from pathlib import Path
+
 import base64
 import os
 import stat
 import subprocess
+from pathlib import Path
 
 
 class ClientError(Exception):
     pass
 
 
-_WINDOWS_ACL = r'''
+_WINDOWS_ACL = r"""
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try {
@@ -45,42 +46,63 @@ if (-not $allowed) { throw 'Credential path must grant access to the current use
     [Console]::Error.WriteLine($_.Exception.Message)
     exit 1
 }
-'''
+"""  # noqa: E501 -- Preserve the embedded PowerShell script verbatim.
 
 
 def windows_acl(path: Path, *, secure: bool = False) -> None:
-    shell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    shell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
     # Windows PowerShell must not inherit PowerShell 7's incompatible module paths.
-    environment = {key: value for key, value in os.environ.items() if key.upper() != 'PSMODULEPATH'}
-    environment.update(DNSPOKE_ACL_PATH=str(path.resolve()), DNSPOKE_ACL_MODE='secure' if secure else 'check')
-    encoded = base64.b64encode(_WINDOWS_ACL.encode('utf-16-le')).decode('ascii')
-    result = subprocess.run([str(shell), '-NoLogo', '-NoProfile', '-NonInteractive', '-OutputFormat', 'Text', '-EncodedCommand', encoded],
-                            env=environment, capture_output=True, timeout=30, check=False,
-                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    environment = {key: value for key, value in os.environ.items() if key.upper() != "PSMODULEPATH"}
+    environment.update(
+        DNSPOKE_ACL_PATH=str(path.resolve()), DNSPOKE_ACL_MODE="secure" if secure else "check"
+    )
+    encoded = base64.b64encode(_WINDOWS_ACL.encode("utf-16-le")).decode("ascii")
+    result = subprocess.run(
+        [
+            str(shell),
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-OutputFormat",
+            "Text",
+            "-EncodedCommand",
+            encoded,
+        ],
+        env=environment,
+        capture_output=True,
+        timeout=30,
+        check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
     if result.returncode:
-        detail = result.stderr.decode('utf-8', errors='replace').strip()
-        raise ClientError('Windows permissions check failed: ' + detail[:2000])
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ClientError("Windows permissions check failed: " + detail[:2000])
 
 
 def config_path() -> Path:
-    if os.environ.get('XDG_CONFIG_HOME'):
-        base = Path(os.environ['XDG_CONFIG_HOME'])
-    elif os.name == 'nt':
-        base = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local'))
+    if os.environ.get("XDG_CONFIG_HOME"):
+        base = Path(os.environ["XDG_CONFIG_HOME"])
+    elif os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
     else:
-        base = Path.home() / '.config'
-    return base / 'dnspoke/device.json'
+        base = Path.home() / ".config"
+    return base / "dnspoke/device.json"
 
 
 def check_path(path: Path, *, directory: bool = False) -> None:
     info = path.lstat()
-    if (path.is_symlink() or getattr(info, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
-            or not (stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode))):
-        raise ClientError('Credential paths must be regular files and directories without links')
-    if os.name == 'nt':
+    if (
+        path.is_symlink()
+        or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        or not (stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode))
+    ):
+        raise ClientError("Credential paths must be regular files and directories without links")
+    if os.name == "nt":
         windows_acl(path)
     elif info.st_uid != os.getuid() or info.st_mode & 0o077:
-        raise ClientError('Credential paths must be owned by you and private (file 600, directory 700)')
+        raise ClientError(
+            "Credential paths must be owned by you and private (file 600, directory 700)"
+        )
 
 
 def prepare_directory(path: Path) -> None:
@@ -89,13 +111,13 @@ def prepare_directory(path: Path) -> None:
     except FileExistsError:
         pass
     else:
-        if os.name == 'nt':
+        if os.name == "nt":
             windows_acl(path, secure=True)
     check_path(path, directory=True)
 
 
 def secure_file(path: Path) -> None:
-    if os.name == 'nt':
+    if os.name == "nt":
         windows_acl(path, secure=True)
     else:
         path.chmod(0o600)

@@ -20,7 +20,7 @@ To upgrade, run `brew update && brew upgrade dnspoke`, then restart a running se
 The shell installer is an alternative when you do not use Homebrew. It also works on macOS. Install Python 3.12+ with SSL and `venv` support first. Debian and Ubuntu may require the matching `python3-venv` package.
 
 ```sh
-curl -fsSLo install.sh https://raw.githubusercontent.com/brandonscript/dnspoke/v0.1.7/install.sh
+curl -fsSLo install.sh https://raw.githubusercontent.com/brandonscript/dnspoke/v0.1.8/install.sh
 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 dnspoke enroll
@@ -69,7 +69,7 @@ winget install --exact --id Python.Python.3.14
 Open a new PowerShell window, then download and run the installer:
 
 ```powershell
-Invoke-WebRequest https://raw.githubusercontent.com/brandonscript/dnspoke/v0.1.7/install.ps1 -OutFile install.ps1
+Invoke-WebRequest https://raw.githubusercontent.com/brandonscript/dnspoke/v0.1.8/install.ps1 -OutFile install.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 $env:Path = "$env:LOCALAPPDATA\Programs\dnspoke\bin;$env:Path"
 dnspoke enroll

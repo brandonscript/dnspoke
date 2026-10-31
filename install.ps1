@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^v[0-9]+\.[0-9]+\.[0-9]+$')]
-    [string]$Version = 'v0.1.7',
+    [string]$Version = 'v0.1.8',
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\dnspoke'),
     [string]$Python,
     [string]$Source,

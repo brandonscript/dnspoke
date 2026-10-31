@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dnspoke"
-version = "0.1.7"
+version = "0.1.8"
 description = "Self-hosted dynamic DNS with hostname-scoped invitations"
 readme = "README.md"
 requires-python = ">=3.12"
